@@ -6,12 +6,27 @@ polynomial time and are suitable for real-time screening.
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, TypedDict
+
+from acquisition_platform.exceptions import (
+    EmptyInputError,
+    InvalidRangeError,
+    ValidationError,
+)
+from acquisition_platform.serialization import SerializableMixin
+
+
+class GraphDict(TypedDict, total=False):
+    """TypedDict for relationship graphs passed to fraud analysis."""
+
+    nodes: list[str]
+    edges: list[tuple[str, str]]
 
 
 @dataclass
-class FraudSignal:
+class FraudSignal(SerializableMixin):
     """A single fraud-related signal extracted from a listing or account."""
 
     name: str
@@ -19,7 +34,7 @@ class FraudSignal:
 
 
 @dataclass
-class FraudScore:
+class FraudScore(SerializableMixin):
     """Result of scoring a set of fraud signals."""
 
     score: float
@@ -54,12 +69,17 @@ class FraudDetector:
         how many of the expected signals were provided.
         """
         if not signals:
-            return FraudScore(
-                score=0.0,
-                risk_level="low",
-                confidence=0.0,
-                explanations=["No signals provided"],
-            )
+            raise EmptyInputError("signals list cannot be empty")
+
+        for signal in signals:
+            if math.isnan(signal.value) or math.isinf(signal.value):
+                raise ValidationError(
+                    f"signal '{signal.name}' has invalid value: {signal.value}"
+                )
+            if signal.value < 0 or signal.value > 1:
+                raise InvalidRangeError(
+                    f"signal '{signal.name}' value must be in [0, 1], got {signal.value}"
+                )
 
         total_weight = 0.0
         weighted_sum = 0.0

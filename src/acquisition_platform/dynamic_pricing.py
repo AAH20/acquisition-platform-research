@@ -8,9 +8,12 @@ target valuation and acquisition pricing scenarios.
 
 from dataclasses import dataclass
 
+from acquisition_platform.exceptions import InvalidRangeError, ValidationError
+from acquisition_platform.serialization import SerializableMixin
+
 
 @dataclass
-class PriceRecommendation:
+class PriceRecommendation(SerializableMixin):
     """Result of a dynamic pricing calculation."""
 
     recommended_price: float
@@ -41,6 +44,26 @@ class PricingEngine:
         Returns:
             A PriceRecommendation with computed pricing metrics.
         """
+        if base_value <= 0:
+            raise ValidationError(f"base_value must be positive, got {base_value}")
+        if demand_level < 0 or demand_level > 1:
+            raise InvalidRangeError(
+                f"demand_level must be in [0, 1], got {demand_level}"
+            )
+        if competition_level < 0 or competition_level > 1:
+            raise InvalidRangeError(
+                f"competition_level must be in [0, 1], got {competition_level}"
+            )
+
+        valid_conditions = {"bull", "bear", "normal"}
+        if market_condition not in valid_conditions:
+            raise ValidationError(
+                f"market_condition must be one of {valid_conditions}, got '{market_condition}'"
+            )
+
+        if base_value <= 0:
+            raise ValidationError(f"base_value must be positive, got {base_value}")
+
         demand_multiplier = 0.8 + demand_level * 0.4
         competition_multiplier = 1.2 - competition_level * 0.4
 
@@ -51,11 +74,12 @@ class PricingEngine:
         }
         market_multiplier = market_multipliers.get(market_condition, 1.0)
 
-        recommended_price = (
+        raw_price = (
             base_value * demand_multiplier * competition_multiplier * market_multiplier
         )
         floor_price = base_value * 0.7
         ceiling_price = base_value * 1.5
+        recommended_price = max(floor_price, min(ceiling_price, raw_price))
         equilibrium_price = (
             base_value * (demand_multiplier + competition_multiplier) / 2
         )

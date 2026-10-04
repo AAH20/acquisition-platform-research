@@ -1,0 +1,2 @@
+[console_scripts]
+acquisition-platform = acquisition_platform.__main__:main

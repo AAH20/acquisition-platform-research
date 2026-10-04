@@ -24,21 +24,37 @@ from __future__ import annotations
 import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass
+from typing import Any, TypedDict
+
+from acquisition_platform.exceptions import (
+    EmptyInputError,
+    InvalidRangeError,
+    ValidationError,
+)
+from acquisition_platform.serialization import SerializableMixin
+
+
+class EntityDict(TypedDict, total=False):
+    """TypedDict for entity records passed to the resolver."""
+
+    id: str
+    name: str
+    domain: str
 
 
 @dataclass
-class ResolvedEntity:
+class ResolvedEntity(SerializableMixin):
     """A resolved entity with its cluster members and canonical name."""
 
-    entities: list[dict]
+    entities: list[dict[str, Any]]
     canonical_name: str
 
 
 @dataclass
-class EntityCluster:
+class EntityCluster(SerializableMixin):
     """A cluster of entities that refer to the same real-world entity."""
 
-    entities: list[dict]
+    entities: list[dict[str, Any]]
     canonical_name: str
 
 
@@ -151,10 +167,14 @@ class EntityResolver:
     """
 
     def __init__(self, threshold: float = 0.85) -> None:
+        if threshold < 0 or threshold > 1:
+            raise InvalidRangeError(
+                f"threshold must be in [0, 1], got {threshold}"
+            )
         self.threshold = threshold
         self.comparison_count: int = 0
 
-    def resolve(self, entities: list[dict]) -> list[EntityCluster]:
+    def resolve(self, entities: list[dict[str, Any]]) -> list[EntityCluster]:
         """Resolve a list of entity dicts into clusters.
 
         Each entity dict should have at least a ``name`` key and
@@ -169,7 +189,7 @@ class EntityResolver:
         self.comparison_count = 0
 
         if not entities:
-            return []
+            raise EmptyInputError("entities list cannot be empty")
 
         n = len(entities)
         uf = _UnionFind(n)
@@ -214,13 +234,60 @@ class EntityResolver:
 
         return result
 
+    def resolve_batch(
+        self, entities: list[dict[str, Any]], chunk_size: int = 100
+    ) -> list[EntityCluster]:
+        """Resolve entities in batches (chunks).
+
+        Splits the entity list into chunks and resolves each chunk
+        independently. This reduces peak memory usage for large datasets
+        at the cost of missing cross-chunk matches.
+
+        Args:
+            entities: List of entity dicts to resolve.
+            chunk_size: Number of entities per chunk.
+
+        Returns:
+            Combined list of EntityCluster objects from all chunks.
+
+        Raises:
+            EmptyInputError: If entities is empty.
+            ValidationError: If chunk_size is not positive.
+        """
+        if not entities:
+            raise EmptyInputError("entities list cannot be empty")
+        if chunk_size <= 0:
+            raise ValidationError(f"chunk_size must be positive, got {chunk_size}")
+
+        all_clusters: list[EntityCluster] = []
+        for i in range(0, len(entities), chunk_size):
+            chunk = entities[i : i + chunk_size]
+            clusters = self.resolve(chunk)
+            all_clusters.extend(clusters)
+        return all_clusters
+
+    def export_clusters(self, clusters: list[EntityCluster], path: str) -> None:
+        """Export entity clusters to a JSON file."""
+        from acquisition_platform.data_io import export_to_json
+        data = [
+            {"canonical_name": c.canonical_name, "entities": c.entities}
+            for c in clusters
+        ]
+        export_to_json(data, path)
+
+    def import_entities(self, path: str) -> list[dict[str, Any]]:
+        """Import entities from a JSON file."""
+        from acquisition_platform.data_io import import_from_json
+        result: list[dict[str, Any]] = import_from_json(path)
+        return result
+
     @staticmethod
-    def _canonical_name(entities: list[dict]) -> str:
+    def _canonical_name(entities: list[dict[str, Any]]) -> str:
         """Pick the most frequent name; first encountered wins ties."""
-        names = [e.get("name", "") for e in entities]
+        names = [str(e.get("name", "")) for e in entities]
         counts = Counter(names)
         max_count = max(counts.values())
         for name in names:
             if counts[name] == max_count:
-                return name
-        return names[0]  # unreachable when entities is non-empty
+                return str(name)
+        return str(names[0])  # unreachable when entities is non-empty

@@ -1,16 +1,17 @@
 """Tests for portfolio optimization module."""
 import pytest
+
+from acquisition_platform.exceptions import EmptyInputError
 from acquisition_platform.portfolio_optimizer import PortfolioOptimizer, Asset, Portfolio
 
 
 class TestPortfolioOptimizer:
     """TDD tests for the portfolio optimizer (MIQP — Mixed Integer Quadratic Program)."""
 
-    def test_empty_portfolio_returns_empty(self):
+    def test_empty_portfolio_raises(self):
         optimizer = PortfolioOptimizer(budget=1000000)
-        result = optimizer.optimize([], risk_tolerance=0.5)
-        assert result.assets == []
-        assert result.expected_return == 0
+        with pytest.raises(EmptyInputError):
+            optimizer.optimize([], risk_tolerance=0.5)
 
     def test_single_asset_within_budget(self):
         optimizer = PortfolioOptimizer(budget=1000000)

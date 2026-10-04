@@ -1,14 +1,17 @@
 """Tests for search ranking module."""
 import pytest
+
+from acquisition_platform.exceptions import EmptyInputError
 from acquisition_platform.search_ranking import SearchRanker, RankedListing, Listing
 
 
 class TestSearchRanker:
     """TDD tests for the search ranking engine (submodular max)."""
 
-    def test_empty_query_returns_empty(self):
+    def test_empty_listings_raises(self):
         ranker = SearchRanker()
-        assert ranker.rank("", []) == []
+        with pytest.raises(EmptyInputError):
+            ranker.rank("", [])
 
     def test_single_listing_returns_single_result(self):
         ranker = SearchRanker()

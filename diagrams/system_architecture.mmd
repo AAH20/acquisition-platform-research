@@ -1,83 +1,93 @@
 graph TB
-    subgraph External["External Data Sources"]
-        CB[Crunchbase API]
-        PB[PitchBook API]
-        FL[Flippa Marketplace]
-        AC[Acquire.com]
-        EF[Empire Flippers]
-        QL[Quiet Light]
-        FEI[FE International]
+    subgraph Interface["Interface Layer"]
+        INIT[Package Init<br/>__init__.py]
+        CLI[CLI<br/>__main__.py]
+        API[REST API<br/>api.py]
+        ORCH[Orchestrator<br/>orchestrator.py]
+        REPORT[Reporting<br/>reporting.py]
     end
 
-    subgraph Ingestion["Data Ingestion Layer"]
-        SCRAPER[Web Crawlers]
-        API_CLIENT[API Client]
-        NORMALIZER[Data Normalizer]
-        VALIDATOR[Data Validator]
+    subgraph Engines["Core Optimization Engines"]
+        MATCH[Buyer-Seller Matching<br/>matching.py<br/>GAP Solver]
+        VAL[Valuation Engine<br/>valuation.py<br/>DCF/Comps/SDE/ARR/Ensemble]
+        FRAUD[Fraud Detection<br/>fraud_detection.py<br/>Signal Scoring + Graph]
+        PORT[Portfolio Optimizer<br/>portfolio_optimizer.py<br/>MIQP]
+        PRICE[Dynamic Pricing<br/>dynamic_pricing.py<br/>Stackelberg]
+        ER[Entity Resolution<br/>entity_resolution.py<br/>Blocking + Jaro-Winkler]
+        RANK[Search Ranking<br/>search_ranking.py<br/>Submodular Max]
+        AUC[Auction Design<br/>auction_design.py<br/>Vickrey/GSP/English/Dutch]
+        DD[Due Diligence<br/>due_diligence.py<br/>Job Shop Scheduling]
+        XB[Cross-Border M&A<br/>cross_border.py<br/>Multi-Constraint]
+        REC[Recommendation<br/>recommendation.py<br/>Hybrid CF + Content]
+        EVO[Evolution Engine<br/>evolution.py<br/>Genetic Algorithm]
     end
 
-    subgraph Storage["Storage Layer"]
-        GRAPH_DB[(Neo4j Graph DB)]
-        DW[(Snowflake DW)]
-        CACHE[(Redis Cache)]
-        VDR[(Virtual Data Room)]
+    subgraph Infrastructure["Infrastructure Layer"]
+        EXC[Exceptions<br/>exceptions.py]
+        SER[Serialization<br/>serialization.py]
+        OBS[Observability<br/>observability.py]
+        CACHE[Caching<br/>caching.py]
+        CFG[Config<br/>config.py]
+        SEC[Security<br/>security.py]
+        NOTIF[Notifications<br/>notifications.py]
+        IO[Data I/O<br/>data_io.py]
+        BATCH[Batch Processing<br/>batch.py]
+        SCHEMAS[Schemas<br/>schemas.py]
     end
 
-    subgraph Core["Core Optimization Engine"]
-        MATCHING[Buyer-Seller Matching<br/>GAP Solver]
-        VALUATION[Valuation Engine<br/>PPAD-hard]
-        FRAUD[Fraud Detection<br/>Dense Subgraph]
-        PORTFOLIO[Portfolio Optimizer<br/>MIQP]
-        PRICING[Dynamic Pricing<br/>Stackelberg]
-        AUCTION[Auction Designer<br/>#P-hard]
-        ER[Entity Resolution<br/>O(n²)]
-        RANKING[Search Ranking<br/>Submodular Max]
-        DD[Due Diligence<br/>Job Shop]
-        XB[Cross-Border M&A<br/>Multi-Constraint]
+    subgraph Evaluation["Evaluation Layer"]
+        BENCH[Benchmark<br/>evolution.py]
     end
 
-    subgraph ML["ML/NLP Layer"]
-        GNN[GNN Matcher]
-        LTR[Learning to Rank]
-        NLP[NLP Entity Extraction]
-        ENSEMBLE[Ensemble Valuator]
-        XGB[XGBoost Fraud Detector]
-        LLM[LLM Advisor]
-    end
+    INIT --> CLI
+    INIT --> API
+    CLI --> ORCH
+    API --> ORCH
+    ORCH --> MATCH
+    ORCH --> VAL
+    ORCH --> FRAUD
+    ORCH --> PORT
+    ORCH --> PRICE
+    ORCH --> RANK
+    ORCH --> EVO
+    API --> AUC
+    API --> DD
+    API --> XB
+    API --> REC
+    API --> ER
 
-    subgraph Evolution["Evolution & Evaluation"]
-        BENCH[Benchmark Suite]
-        EVO[Evolution Engine]
-        EVAL[Evaluation Framework]
-        OPT[Hyperparameter Optimizer]
-    end
+    MATCH --> SER
+    VAL --> SER
+    FRAUD --> SER
+    PORT --> SER
+    PRICE --> SER
+    ER --> SER
+    RANK --> SER
+    AUC --> SER
+    DD --> SER
+    XB --> SER
+    REC --> SER
+    EVO --> SER
 
-    subgraph API["API Layer"]
-        REST[REST API]
-        MCP[MCP Server]
-        WS[WebSocket]
-    end
+    MATCH --> OBS
+    VAL --> OBS
+    FRAUD --> OBS
+    PORT --> OBS
+    PRICE --> OBS
+    ER --> OBS
+    RANK --> OBS
+    AUC --> OBS
+    DD --> OBS
+    XB --> OBS
+    REC --> OBS
+    EVO --> OBS
 
-    subgraph UI["User Interface"]
-        DASH[Dashboard]
-        SEARCH[Search Interface]
-        DEAL[Deal Room]
-        ANALYTICS[Analytics]
-    end
+    REC --> CACHE
+    EVO --> BENCH
+    ORCH --> REPORT
+    REPORT --> IO
 
-    External --> Ingestion
-    Ingestion --> Storage
-    Storage --> Core
-    Core --> ML
-    ML --> Evolution
-    Evolution --> Core
-    Core --> API
-    API --> UI
-
-    style Core fill:#1f6feb,stroke:#30363d,color:#fff
-    style ML fill:#8b5cff,stroke:#30363d,color:#fff
-    style Evolution fill:#238636,stroke:#30363d,color:#fff
-    style External fill:#6e7681,stroke:#30363d,color:#fff
-    style Storage fill:#d29922,stroke:#30363d,color:#fff
-    style API fill:#f85149,stroke:#30363d,color:#fff
-    style UI fill:#1f6feb,stroke:#30363d,color:#fff
+    style Engines fill:#1f6feb,stroke:#30363d,color:#fff
+    style Interface fill:#f85149,stroke:#30363d,color:#fff
+    style Infrastructure fill:#8b5cff,stroke:#30363d,color:#fff
+    style Evaluation fill:#238636,stroke:#30363d,color:#fff

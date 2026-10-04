@@ -6,10 +6,14 @@ to produce a ranked list of listings.
 """
 
 from dataclasses import dataclass
+from typing import Any
+
+from acquisition_platform.exceptions import EmptyInputError, InvalidRangeError
+from acquisition_platform.serialization import SerializableMixin
 
 
 @dataclass
-class Listing:
+class Listing(SerializableMixin):
     """A searchable listing with relevance and category metadata."""
 
     id: str
@@ -19,7 +23,7 @@ class Listing:
 
 
 @dataclass
-class RankedListing:
+class RankedListing(SerializableMixin):
     """A listing with its computed ranking score."""
 
     id: str
@@ -41,7 +45,7 @@ class SearchRanker:
         self,
         query: str,
         listings: list[Listing],
-        user_preferences: dict | None = None,
+        user_preferences: dict[str, Any] | None = None,
     ) -> list[RankedListing]:
         """Rank listings by computed score, deduplicated by id.
 
@@ -55,7 +59,13 @@ class SearchRanker:
             List of RankedListing sorted by score descending, deduplicated by id.
         """
         if not listings:
-            return []
+            raise EmptyInputError("listings list cannot be empty")
+
+        for listing in listings:
+            if listing.relevance < 0 or listing.relevance > 1:
+                raise InvalidRangeError(
+                    f"listing '{listing.id}' has invalid relevance: {listing.relevance}"
+                )
 
         preferred_category = None
         if user_preferences:

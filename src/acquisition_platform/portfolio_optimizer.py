@@ -10,9 +10,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from acquisition_platform.exceptions import (
+    EmptyInputError,
+    InvalidRangeError,
+    ValidationError,
+)
+from acquisition_platform.serialization import SerializableMixin
+
 
 @dataclass
-class Asset:
+class Asset(SerializableMixin):
     """A candidate acquisition target."""
 
     id: str
@@ -23,7 +30,7 @@ class Asset:
 
 
 @dataclass
-class Portfolio:
+class Portfolio(SerializableMixin):
     """An optimized portfolio of assets."""
 
     assets: list[Asset] = field(default_factory=list)
@@ -48,6 +55,10 @@ class PortfolioOptimizer:
             budget: Total capital available for acquisitions.
             max_assets: Maximum number of assets in the portfolio (cardinality constraint).
         """
+        if budget <= 0:
+            raise ValidationError(f"budget must be positive, got {budget}")
+        if max_assets <= 0:
+            raise ValidationError(f"max_assets must be positive, got {max_assets}")
         self.budget = budget
         self.max_assets = max_assets
 
@@ -64,7 +75,20 @@ class PortfolioOptimizer:
             Optimized Portfolio with selected assets.
         """
         if not assets:
-            return Portfolio()
+            raise EmptyInputError("assets list cannot be empty")
+        if risk_tolerance < 0 or risk_tolerance > 1:
+            raise InvalidRangeError(
+                f"risk_tolerance must be in [0, 1], got {risk_tolerance}"
+            )
+        for asset in assets:
+            if asset.cost < 0:
+                raise ValidationError(
+                    f"asset '{asset.id}' has negative cost: {asset.cost}"
+                )
+            if asset.risk < 0:
+                raise ValidationError(
+                    f"asset '{asset.id}' has negative risk: {asset.risk}"
+                )
 
         # Filter assets within budget
         affordable = [a for a in assets if a.cost <= self.budget]
@@ -106,9 +130,12 @@ class PortfolioOptimizer:
             return Portfolio()
 
         total_cost = sum(a.cost for a in selected)
-        expected_return = sum(
-            a.expected_return * (a.cost / total_cost) for a in selected
-        )
+        if total_cost > 0:
+            expected_return = sum(
+                a.expected_return * (a.cost / total_cost) for a in selected
+            )
+        else:
+            expected_return = sum(a.expected_return for a in selected) / len(selected)
         total_risk = sum(a.risk for a in selected)
         sharpe_ratio = expected_return / (total_risk + 0.01)
 

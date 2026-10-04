@@ -20,28 +20,32 @@ sellers, which is efficient for the typical scale of acquisition matching.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
+
+from acquisition_platform.exceptions import EmptyInputError, ValidationError
+from acquisition_platform.serialization import SerializableMixin
 
 
 @dataclass
-class Buyer:
+class Buyer(SerializableMixin):
     """Represents a buyer in the acquisition marketplace."""
 
     id: str
     budget: float
-    preferences: dict
+    preferences: dict[str, Any]
 
 
 @dataclass
-class Seller:
+class Seller(SerializableMixin):
     """Represents a seller in the acquisition marketplace."""
 
     id: str
     asking_price: float
-    attributes: dict
+    attributes: dict[str, Any]
 
 
 @dataclass
-class Match:
+class Match(SerializableMixin):
     """Represents a matched buyer-seller pair with scoring metadata."""
 
     buyer_id: str
@@ -69,8 +73,21 @@ class BuyerSellerMatcher:
             List of Match objects sorted by score descending. Each buyer and each
             seller appears in at most one match.
         """
-        if not buyers or not sellers:
-            return []
+        if not buyers:
+            raise EmptyInputError("buyers list cannot be empty")
+        if not sellers:
+            raise EmptyInputError("sellers list cannot be empty")
+
+        for buyer in buyers:
+            if buyer.budget <= 0:
+                raise ValidationError(
+                    f"buyer '{buyer.id}' has invalid budget: {buyer.budget}"
+                )
+        for seller in sellers:
+            if seller.asking_price <= 0:
+                raise ValidationError(
+                    f"seller '{seller.id}' has invalid asking_price: {seller.asking_price}"
+                )
 
         # Generate all feasible pairs with scores
         candidates: list[tuple[float, float, Buyer, Seller]] = []
@@ -105,6 +122,60 @@ class BuyerSellerMatcher:
             matched_sellers.add(seller.id)
 
         return matches
+
+    def match_batch(
+        self, buyers: list[Buyer], sellers: list[Seller], chunk_size: int = 100
+    ) -> list[Match]:
+        """Match buyers to sellers in batches (chunks).
+
+        Splits both buyer and seller lists into chunks and runs the matching
+        algorithm on each chunk pair. This reduces peak memory usage for
+        large datasets at the cost of missing cross-chunk matches.
+
+        Args:
+            buyers: List of Buyer objects.
+            sellers: List of Seller objects.
+            chunk_size: Number of items per chunk.
+
+        Returns:
+            Combined list of Match objects from all chunk pairs.
+
+        Raises:
+            EmptyInputError: If buyers or sellers is empty.
+            ValidationError: If chunk_size is not positive.
+        """
+        if not buyers:
+            raise EmptyInputError("buyers list cannot be empty")
+        if not sellers:
+            raise EmptyInputError("sellers list cannot be empty")
+        if chunk_size <= 0:
+            raise ValidationError(f"chunk_size must be positive, got {chunk_size}")
+
+        all_matches: list[Match] = []
+        for i in range(0, len(buyers), chunk_size):
+            buyer_chunk = buyers[i : i + chunk_size]
+            for j in range(0, len(sellers), chunk_size):
+                seller_chunk = sellers[j : j + chunk_size]
+                matches = self.match(buyer_chunk, seller_chunk)
+                all_matches.extend(matches)
+        return all_matches
+
+    def export_matches(self, matches: list[Match], path: str) -> None:
+        """Export matches to a JSON file."""
+        from acquisition_platform.data_io import export_to_json
+        data = [
+            {"buyer_id": m.buyer_id, "seller_id": m.seller_id, "score": m.score, "confidence": m.confidence}
+            for m in matches
+        ]
+        export_to_json(data, path)
+
+    def import_buyers_sellers(self, path: str) -> tuple[list[Buyer], list[Seller]]:
+        """Import buyers and sellers from a JSON file."""
+        from acquisition_platform.data_io import import_from_json
+        data = import_from_json(path)
+        buyers = [Buyer(id=b["id"], budget=b["budget"], preferences=b.get("preferences", {})) for b in data.get("buyers", [])]
+        sellers = [Seller(id=s["id"], asking_price=s["asking_price"], attributes=s.get("attributes", {})) for s in data.get("sellers", [])]
+        return buyers, sellers
 
     def _is_feasible(self, buyer: Buyer, seller: Seller) -> bool:
         """Check if a buyer-seller pair is feasible.

@@ -1,14 +1,17 @@
 """Tests for entity resolution module."""
 import pytest
+
+from acquisition_platform.exceptions import EmptyInputError
 from acquisition_platform.entity_resolution import EntityResolver, ResolvedEntity, EntityCluster
 
 
 class TestEntityResolver:
     """TDD tests for the entity resolution engine (O(n²) pairwise)."""
 
-    def test_empty_input_returns_empty(self):
+    def test_empty_input_raises(self):
         resolver = EntityResolver()
-        assert resolver.resolve([]) == []
+        with pytest.raises(EmptyInputError):
+            resolver.resolve([])
 
     def test_single_entity_returns_single_cluster(self):
         resolver = EntityResolver()

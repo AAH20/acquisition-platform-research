@@ -16,9 +16,12 @@ import statistics
 from dataclasses import dataclass
 from typing import Callable, Tuple
 
+from acquisition_platform.exceptions import InvalidRangeError, ValidationError
+from acquisition_platform.serialization import SerializableMixin
+
 
 @dataclass
-class EvaluationResult:
+class EvaluationResult(SerializableMixin):
     """Result of evaluating a model against a benchmark target."""
 
     passed: bool
@@ -27,7 +30,7 @@ class EvaluationResult:
 
 
 @dataclass
-class Benchmark:
+class Benchmark(SerializableMixin):
     """A benchmark target for evaluating model performance."""
 
     name: str
@@ -52,7 +55,7 @@ class Benchmark:
 
 
 @dataclass
-class EvolutionResult:
+class EvolutionResult(SerializableMixin):
     """Result of running the genetic algorithm evolution."""
 
     best_fitness: float
@@ -86,6 +89,16 @@ class EvolutionEngine:
             mutation_rate: Probability of mutating each gene.
             elitism: Number of top individuals preserved unchanged.
         """
+        if population_size <= 0:
+            raise ValidationError(
+                f"population_size must be positive, got {population_size}"
+            )
+        if generations <= 0:
+            raise ValidationError(f"generations must be positive, got {generations}")
+        if mutation_rate < 0 or mutation_rate > 1:
+            raise InvalidRangeError(
+                f"mutation_rate must be in [0, 1], got {mutation_rate}"
+            )
         self.population_size = population_size
         self.generations = generations
         self.mutation_rate = mutation_rate

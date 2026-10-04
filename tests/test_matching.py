@@ -1,14 +1,17 @@
 """Tests for buyer-seller matching module (GAP — Generalized Assignment Problem)."""
 import pytest
+
+from acquisition_platform.exceptions import EmptyInputError
 from acquisition_platform.matching import BuyerSellerMatcher, Match, Buyer, Seller
 
 
 class TestBuyerSellerMatcher:
     """TDD tests for the matching engine."""
 
-    def test_empty_inputs_return_empty_matches(self):
+    def test_empty_inputs_raise(self):
         matcher = BuyerSellerMatcher()
-        assert matcher.match([], []) == []
+        with pytest.raises(EmptyInputError):
+            matcher.match([], [])
 
     def test_single_buyer_single_seller_returns_match(self):
         matcher = BuyerSellerMatcher()

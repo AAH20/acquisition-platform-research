@@ -1,37 +1,79 @@
 graph TD
-    subgraph DataLayer["Data Layer"]
-        ER[Entity Resolution]
-        VAL[Valuation Engine]
-        FRAUD[Fraud Detection]
+    subgraph Interface["Interface Layer"]
+        INIT[Package Init<br/>__init__.py]
+        CLI[CLI<br/>__main__.py]
+        API[REST API<br/>api.py]
+        ORCH[Orchestrator<br/>orchestrator.py]
+        REPORT[Reporting<br/>reporting.py]
     end
 
     subgraph MatchingLayer["Matching Layer"]
-        MATCH[Buyer-Seller Matching]
-        RANK[Search Ranking]
-        REC[Recommendation System]
+        MATCH[Buyer-Seller Matching<br/>matching.py]
+        RANK[Search Ranking<br/>search_ranking.py]
+        REC[Recommendation<br/>recommendation.py]
+    end
+
+    subgraph ValuationLayer["Valuation Layer"]
+        VAL[Valuation<br/>valuation.py]
+        PRICE[Dynamic Pricing<br/>dynamic_pricing.py]
+        AUC[Auction Design<br/>auction_design.py]
+    end
+
+    subgraph RiskLayer["Risk & Compliance"]
+        FRAUD[Fraud Detection<br/>fraud_detection.py]
+        DD[Due Diligence<br/>due_diligence.py]
+        XB[Cross-Border<br/>cross_border.py]
+        SEC[Security<br/>security.py]
     end
 
     subgraph OptimizationLayer["Optimization Layer"]
-        PORT[Portfolio Optimization]
-        PRICE[Dynamic Pricing]
-        AUC[Auction Design]
-        DD[Due Diligence]
-        XB[Cross-Border M&A]
+        PORT[Portfolio Optimizer<br/>portfolio_optimizer.py]
+        EVO[Evolution<br/>evolution.py]
     end
 
-    subgraph EvolutionLayer["Evolution Layer"]
-        BENCH[Benchmarks]
-        EVO[Evolution Engine]
-        EVAL[Evaluation]
+    subgraph DataLayer["Data Layer"]
+        ER[Entity Resolution<br/>entity_resolution.py]
+        IO[Data I/O<br/>data_io.py]
+        BATCH[Batch Processing<br/>batch.py]
+        CACHE[Caching<br/>caching.py]
     end
+
+    subgraph SupportLayer["Support Layer"]
+        CFG[Config<br/>config.py]
+        OBS[Observability<br/>observability.py]
+        NOTIF[Notifications<br/>notifications.py]
+        SER[Serialization<br/>serialization.py]
+        EXC[Exceptions<br/>exceptions.py]
+        SCHEMAS[Schemas<br/>schemas.py]
+    end
+
+    INIT --> CLI
+    INIT --> API
+    CLI --> ORCH
+    API --> ORCH
+    ORCH --> MATCH
+    ORCH --> VAL
+    ORCH --> FRAUD
+    ORCH --> PORT
+    ORCH --> PRICE
+    ORCH --> RANK
+    ORCH --> EVO
+    API --> AUC
+    API --> DD
+    API --> XB
+    API --> REC
+    API --> ER
+    ORCH --> REPORT
 
     ER --> MATCH
     ER --> RANK
+    ER --> REC
     VAL --> MATCH
     VAL --> PORT
     VAL --> PRICE
     FRAUD --> MATCH
     FRAUD --> REC
+    FRAUD --> DD
     MATCH --> PORT
     MATCH --> AUC
     RANK --> REC
@@ -40,10 +82,80 @@ graph TD
     AUC --> EVO
     DD --> EVO
     XB --> EVO
-    EVO --> BENCH
-    EVAL --> EVO
+    SEC --> MATCH
+    SEC --> VAL
+    SEC --> FRAUD
+    CFG --> MATCH
+    CFG --> VAL
+    CFG --> FRAUD
+    CFG --> PORT
+    CFG --> PRICE
+    CFG --> ER
+    CFG --> RANK
+    CFG --> EVO
+    OBS --> MATCH
+    OBS --> VAL
+    OBS --> FRAUD
+    OBS --> PORT
+    OBS --> PRICE
+    OBS --> ER
+    OBS --> RANK
+    OBS --> AUC
+    OBS --> DD
+    OBS --> XB
+    OBS --> REC
+    OBS --> EVO
+    NOTIF --> FRAUD
+    NOTIF --> MATCH
+    NOTIF --> PORT
+    NOTIF --> EVO
+    CACHE --> REC
+    BATCH --> MATCH
+    BATCH --> VAL
+    BATCH --> ER
+    IO --> ER
+    IO --> VAL
+    SER --> MATCH
+    SER --> VAL
+    SER --> FRAUD
+    SER --> PORT
+    SER --> PRICE
+    SER --> ER
+    SER --> RANK
+    SER --> AUC
+    SER --> DD
+    SER --> XB
+    SER --> REC
+    SER --> EVO
+    EXC --> MATCH
+    EXC --> VAL
+    EXC --> FRAUD
+    EXC --> PORT
+    EXC --> PRICE
+    EXC --> ER
+    EXC --> RANK
+    EXC --> AUC
+    EXC --> DD
+    EXC --> XB
+    EXC --> REC
+    EXC --> EVO
+    SCHEMAS --> MATCH
+    SCHEMAS --> VAL
+    SCHEMAS --> FRAUD
+    SCHEMAS --> PORT
+    SCHEMAS --> PRICE
+    SCHEMAS --> ER
+    SCHEMAS --> RANK
+    SCHEMAS --> AUC
+    SCHEMAS --> DD
+    SCHEMAS --> XB
+    SCHEMAS --> REC
+    SCHEMAS --> EVO
 
-    style DataLayer fill:#d29922,stroke:#30363d,color:#fff
+    style Interface fill:#f85149,stroke:#30363d,color:#fff
     style MatchingLayer fill:#1f6feb,stroke:#30363d,color:#fff
+    style ValuationLayer fill:#d29922,stroke:#30363d,color:#fff
+    style RiskLayer fill:#f85149,stroke:#30363d,color:#fff
     style OptimizationLayer fill:#8b5cff,stroke:#30363d,color:#fff
-    style EvolutionLayer fill:#238636,stroke:#30363d,color:#fff
+    style DataLayer fill:#238636,stroke:#30363d,color:#fff
+    style SupportLayer fill:#6e7681,stroke:#30363d,color:#fff

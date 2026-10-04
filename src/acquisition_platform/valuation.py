@@ -11,10 +11,19 @@ company analysis, and ensemble approaches that combine multiple signals.
 """
 
 from dataclasses import dataclass
+from typing import Any
+
+from acquisition_platform.exceptions import (
+    DivisionByZeroError,
+    EmptyInputError,
+    InvalidRangeError,
+    ValidationError,
+)
+from acquisition_platform.serialization import SerializableMixin
 
 
 @dataclass
-class ValuationResult:
+class ValuationResult(SerializableMixin):
     """Result of a valuation calculation.
 
     Attributes:
@@ -59,13 +68,42 @@ class ValuationEngine:
         Returns:
             ValuationResult with method "DCF".
         """
+        if free_cash_flow < 0:
+            raise ValidationError(
+                f"free_cash_flow must be non-negative, got {free_cash_flow}"
+            )
+        if growth_rate < 0:
+            raise ValidationError(
+                f"growth_rate must be non-negative, got {growth_rate}"
+            )
+        if years <= 0:
+            raise ValidationError(f"years must be positive, got {years}")
+        if discount_rate < 0:
+            raise ValidationError(
+                f"discount_rate must be non-negative, got {discount_rate}"
+            )
+        if terminal_growth < 0:
+            raise ValidationError(
+                f"terminal_growth must be non-negative, got {terminal_growth}"
+            )
+        if abs(discount_rate - terminal_growth) < 1e-10:
+            raise DivisionByZeroError(
+                "discount_rate and terminal_growth cannot be equal "
+                f"(both are {discount_rate})"
+            )
+
         pv = 0.0
         for t in range(1, years + 1):
             fcf_t = free_cash_flow * (1 + growth_rate) ** t
             pv += fcf_t / (1 + discount_rate) ** t
 
         terminal_fcf = free_cash_flow * (1 + growth_rate) ** years * (1 + terminal_growth)
-        terminal_value = terminal_fcf / (discount_rate - terminal_growth)
+        if terminal_growth > discount_rate:
+            # When terminal growth exceeds discount rate, the Gordon Growth Model
+            # produces a negative value. Use a large finite horizon approximation.
+            terminal_value = terminal_fcf * years / (1 + discount_rate)
+        else:
+            terminal_value = terminal_fcf / (discount_rate - terminal_growth)
         pv_terminal = terminal_value / (1 + discount_rate) ** years
 
         value = pv + pv_terminal
@@ -90,6 +128,10 @@ class ValuationEngine:
         Returns:
             ValuationResult with method "Comps".
         """
+        if metric < 0:
+            raise ValidationError(f"metric must be non-negative, got {metric}")
+        if multiple < 0:
+            raise ValidationError(f"multiple must be non-negative, got {multiple}")
         value = metric * multiple
         return ValuationResult(
             value=value,
@@ -126,6 +168,8 @@ class ValuationEngine:
         Returns:
             ValuationResult with method "Ensemble".
         """
+        if revenue < 0:
+            raise ValidationError(f"revenue must be non-negative, got {revenue}")
         dcf_result = self.dcf_valuation(
             free_cash_flow=free_cash_flow,
             growth_rate=growth_rate,
@@ -155,6 +199,88 @@ class ValuationEngine:
             high_estimate=high_estimate,
         )
 
+    def value_batch(
+        self, financials: list[dict[str, Any]], chunk_size: int = 100
+    ) -> list[ValuationResult]:
+        """Value a batch of financial records in chunks.
+
+        Each dict in ``financials`` should contain the parameters for one
+        valuation method. The method is inferred from the keys present:
+        - If ``free_cash_flow`` is present, uses DCF valuation.
+        - If ``metric`` is present, uses comparable valuation.
+        - If ``sde`` is present, uses SDE valuation.
+        - If ``arr`` is present, uses ARR valuation.
+
+        Args:
+            financials: List of dicts with valuation parameters.
+            chunk_size: Number of records per chunk.
+
+        Returns:
+            List of ValuationResult objects.
+
+        Raises:
+            EmptyInputError: If financials is empty.
+            ValidationError: If chunk_size is not positive or a record
+                has unrecognized parameters.
+        """
+        if not financials:
+            raise EmptyInputError("financials list cannot be empty")
+        if chunk_size <= 0:
+            raise ValidationError(f"chunk_size must be positive, got {chunk_size}")
+
+        all_results: list[ValuationResult] = []
+        for i in range(0, len(financials), chunk_size):
+            chunk = financials[i : i + chunk_size]
+            for record in chunk:
+                result = self._value_single(record)
+                all_results.append(result)
+        return all_results
+
+    def export_valuations(self, valuations: list[ValuationResult], path: str) -> None:
+        """Export valuations to a JSON file."""
+        from acquisition_platform.data_io import export_to_json
+        data = [
+            {"value": v.value, "method": v.method, "confidence": v.confidence, "low_estimate": v.low_estimate, "high_estimate": v.high_estimate}
+            for v in valuations
+        ]
+        export_to_json(data, path)
+
+    def import_financials(self, path: str) -> list[dict[str, Any]]:
+        """Import financial records from a JSON file."""
+        from acquisition_platform.data_io import import_from_json
+        result: list[dict[str, Any]] = import_from_json(path)
+        return result
+
+    def _value_single(self, record: dict[str, Any]) -> ValuationResult:
+        """Value a single financial record, inferring the method from keys."""
+        if "free_cash_flow" in record:
+            return self.dcf_valuation(
+                free_cash_flow=record["free_cash_flow"],
+                growth_rate=record.get("growth_rate", 0.0),
+                discount_rate=record.get("discount_rate", 0.1),
+                terminal_growth=record.get("terminal_growth", 0.02),
+                years=record.get("years", 5),
+            )
+        elif "metric" in record:
+            return self.comparable_valuation(
+                metric=record["metric"],
+                multiple=record.get("multiple", 1.0),
+            )
+        elif "sde" in record:
+            return self.sde_valuation(
+                sde=record["sde"],
+                multiple=record.get("multiple", 1.0),
+            )
+        elif "arr" in record:
+            return self.arr_valuation(
+                arr=record["arr"],
+                multiple=record.get("multiple", 1.0),
+            )
+        else:
+            raise ValidationError(
+                f"Unrecognized valuation record keys: {list(record.keys())}"
+            )
+
     def sde_valuation(self, sde: float, multiple: float) -> ValuationResult:
         """Seller's Discretionary Earnings valuation.
 
@@ -168,6 +294,8 @@ class ValuationEngine:
         Returns:
             ValuationResult with method "SDE".
         """
+        if sde < 0:
+            raise ValidationError(f"sde must be non-negative, got {sde}")
         value = sde * multiple
         return ValuationResult(
             value=value,
@@ -190,6 +318,8 @@ class ValuationEngine:
         Returns:
             ValuationResult with method "ARR".
         """
+        if arr < 0:
+            raise ValidationError(f"arr must be non-negative, got {arr}")
         value = arr * multiple
         return ValuationResult(
             value=value,
