@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "911c2abe-2333-4f5c-83ee-5c435cd18555",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "/home/aah/Downloads/a2z-soc-main 2/acquisition-platform-research/.archify/architecture-system/candidate.json",
+  "output": "/home/aah/Downloads/a2z-soc-main 2/acquisition-platform-research/.archify/architecture-system/system.html",
+  "specification": {
+    "sha256": "d139f11e6d90053004acd7d97ff3be351557d2f913842a65b6bf6b61582d10de",
+    "bytes": 2342
+  },
+  "artifact": {
+    "sha256": "2c6b8b4dbe571268a5d4f4643c8c8f86ebc0b136593102b5d876b288804b132a",
+    "bytes": 755570
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "repo_name": "acquisition-platform-research",
+  "source_path": "/home/aah/Downloads/a2z-soc-main 2/acquisition-platform-research",
+  "source_sha": "c8c04a9",
+  "generated_at": "2026-10-04T16:00:00Z",
+  "generator": "hermes-agent code-wiki skill v0.1.0",
+  "modules_documented": [
+    "matching",
+    "valuation",
+    "fraud_detection",
+    "portfolio_optimizer",
+    "dynamic_pricing",
+    "entity_resolution",
+    "search_ranking",
+    "evolution"
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Acquisition Platform Optimization Engine",
+    "output": "docs/archify-system.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    { "id": "ext", "type": "external", "label": "External Data Sources", "sublabel": "Crunchbase, PitchBook, Flippa", "pos": [40, 200], "size": [140, 60] },
+    { "id": "ingest", "type": "backend", "label": "Data Ingestion", "sublabel": "Crawlers, API, Files", "pos": [240, 200], "size": [130, 60] },
+    { "id": "store", "type": "database", "label": "Storage Layer", "sublabel": "Neo4j, Snowflake, Redis", "pos": [430, 200], "size": [130, 60] },
+    { "id": "core", "type": "backend", "label": "Core Optimization Engine", "sublabel": "8 NP-hard Solvers", "pos": [620, 200], "size": [180, 60] },
+    { "id": "evo", "type": "backend", "label": "Evolution Framework", "sublabel": "Genetic Algorithm", "pos": [880, 200], "size": [130, 60] },
+    { "id": "api", "type": "backend", "label": "API Layer", "sublabel": "REST, MCP, WebSocket", "pos": [1090, 200], "size": [120, 60] },
+    { "id": "ui", "type": "external", "label": "User Interface", "sublabel": "Dashboard, Search, Deals", "pos": [1290, 200], "size": [130, 60] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Optimization Layer", "wraps": ["core", "evo"] }
+  ],
+  "connections": [
+    { "id": "ext-to-ingest", "from": "ext", "to": "ingest", "label": "feeds" },
+    { "id": "ingest-to-store", "from": "ingest", "to": "store", "label": "stores" },
+    { "id": "store-to-core", "from": "store", "to": "core", "label": "reads" },
+    { "id": "core-to-evo", "from": "core", "to": "evo", "label": "optimizes" },
+    { "id": "evo-to-api", "from": "evo", "to": "api", "label": "serves" },
+    { "id": "api-to-ui", "from": "api", "to": "ui", "label": "displays" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Data Layer", "items": ["Crunchbase, PitchBook, Flippa APIs", "Neo4j graph DB for relationships", "Snowflake for analytics"] },
+    { "dot": "emerald", "title": "Optimization", "items": ["GAP matching with greedy approximation", "PPAD-hard valuation with ensemble", "MIQP portfolio optimization"] },
+    { "dot": "rose", "title": "Security", "items": ["Dense subgraph fraud detection", "Weighted signal scoring", "Graph ring analysis"] }
+  ]
+}
