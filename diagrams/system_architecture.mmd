@@ -1,0 +1,83 @@
+graph TB
+    subgraph External["External Data Sources"]
+        CB[Crunchbase API]
+        PB[PitchBook API]
+        FL[Flippa Marketplace]
+        AC[Acquire.com]
+        EF[Empire Flippers]
+        QL[Quiet Light]
+        FEI[FE International]
+    end
+
+    subgraph Ingestion["Data Ingestion Layer"]
+        SCRAPER[Web Crawlers]
+        API_CLIENT[API Client]
+        NORMALIZER[Data Normalizer]
+        VALIDATOR[Data Validator]
+    end
+
+    subgraph Storage["Storage Layer"]
+        GRAPH_DB[(Neo4j Graph DB)]
+        DW[(Snowflake DW)]
+        CACHE[(Redis Cache)]
+        VDR[(Virtual Data Room)]
+    end
+
+    subgraph Core["Core Optimization Engine"]
+        MATCHING[Buyer-Seller Matching<br/>GAP Solver]
+        VALUATION[Valuation Engine<br/>PPAD-hard]
+        FRAUD[Fraud Detection<br/>Dense Subgraph]
+        PORTFOLIO[Portfolio Optimizer<br/>MIQP]
+        PRICING[Dynamic Pricing<br/>Stackelberg]
+        AUCTION[Auction Designer<br/>#P-hard]
+        ER[Entity Resolution<br/>O(n²)]
+        RANKING[Search Ranking<br/>Submodular Max]
+        DD[Due Diligence<br/>Job Shop]
+        XB[Cross-Border M&A<br/>Multi-Constraint]
+    end
+
+    subgraph ML["ML/NLP Layer"]
+        GNN[GNN Matcher]
+        LTR[Learning to Rank]
+        NLP[NLP Entity Extraction]
+        ENSEMBLE[Ensemble Valuator]
+        XGB[XGBoost Fraud Detector]
+        LLM[LLM Advisor]
+    end
+
+    subgraph Evolution["Evolution & Evaluation"]
+        BENCH[Benchmark Suite]
+        EVO[Evolution Engine]
+        EVAL[Evaluation Framework]
+        OPT[Hyperparameter Optimizer]
+    end
+
+    subgraph API["API Layer"]
+        REST[REST API]
+        MCP[MCP Server]
+        WS[WebSocket]
+    end
+
+    subgraph UI["User Interface"]
+        DASH[Dashboard]
+        SEARCH[Search Interface]
+        DEAL[Deal Room]
+        ANALYTICS[Analytics]
+    end
+
+    External --> Ingestion
+    Ingestion --> Storage
+    Storage --> Core
+    Core --> ML
+    ML --> Evolution
+    Evolution --> Core
+    Core --> API
+    API --> UI
+
+    style Core fill:#1f6feb,stroke:#30363d,color:#fff
+    style ML fill:#8b5cff,stroke:#30363d,color:#fff
+    style Evolution fill:#238636,stroke:#30363d,color:#fff
+    style External fill:#6e7681,stroke:#30363d,color:#fff
+    style Storage fill:#d29922,stroke:#30363d,color:#fff
+    style API fill:#f85149,stroke:#30363d,color:#fff
+    style UI fill:#1f6feb,stroke:#30363d,color:#fff

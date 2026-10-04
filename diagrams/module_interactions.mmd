@@ -1,0 +1,49 @@
+graph TD
+    subgraph DataLayer["Data Layer"]
+        ER[Entity Resolution]
+        VAL[Valuation Engine]
+        FRAUD[Fraud Detection]
+    end
+
+    subgraph MatchingLayer["Matching Layer"]
+        MATCH[Buyer-Seller Matching]
+        RANK[Search Ranking]
+        REC[Recommendation System]
+    end
+
+    subgraph OptimizationLayer["Optimization Layer"]
+        PORT[Portfolio Optimization]
+        PRICE[Dynamic Pricing]
+        AUC[Auction Design]
+        DD[Due Diligence]
+        XB[Cross-Border M&A]
+    end
+
+    subgraph EvolutionLayer["Evolution Layer"]
+        BENCH[Benchmarks]
+        EVO[Evolution Engine]
+        EVAL[Evaluation]
+    end
+
+    ER --> MATCH
+    ER --> RANK
+    VAL --> MATCH
+    VAL --> PORT
+    VAL --> PRICE
+    FRAUD --> MATCH
+    FRAUD --> REC
+    MATCH --> PORT
+    MATCH --> AUC
+    RANK --> REC
+    PORT --> EVO
+    PRICE --> EVO
+    AUC --> EVO
+    DD --> EVO
+    XB --> EVO
+    EVO --> BENCH
+    EVAL --> EVO
+
+    style DataLayer fill:#d29922,stroke:#30363d,color:#fff
+    style MatchingLayer fill:#1f6feb,stroke:#30363d,color:#fff
+    style OptimizationLayer fill:#8b5cff,stroke:#30363d,color:#fff
+    style EvolutionLayer fill:#238636,stroke:#30363d,color:#fff

@@ -1,0 +1,59 @@
+flowchart LR
+    subgraph Sources["Data Sources"]
+        S1[Crunchbase]
+        S2[PitchBook]
+        S3[Flippa]
+        S4[Acquire.com]
+        S5[Empire Flippers]
+        S6[Quiet Light]
+        S7[FE International]
+    end
+
+    subgraph Ingestion["Ingestion"]
+        I1[API Polling]
+        I2[Web Scraping]
+        I3[File Upload]
+        I4[Manual Entry]
+    end
+
+    subgraph Processing["Processing"]
+        P1[Normalization]
+        P2[Entity Resolution]
+        P3[Validation]
+        P4[Enrichment]
+    end
+
+    subgraph Storage["Storage"]
+        D1[(Graph DB)]
+        D2[(Data Warehouse)]
+        D3[(Cache)]
+        D4[(VDR)]
+    end
+
+    subgraph Analytics["Analytics"]
+        A1[Valuation]
+        A2[Matching]
+        A3[Fraud Detection]
+        A4[Portfolio Opt]
+        A5[Pricing]
+    end
+
+    subgraph Output["Output"]
+        O1[Recommendations]
+        O2[Alerts]
+        O3[Reports]
+        O4[Deals]
+    end
+
+    Sources --> Ingestion
+    Ingestion --> Processing
+    Processing --> Storage
+    Storage --> Analytics
+    Analytics --> Output
+
+    style Sources fill:#6e7681,stroke:#30363d,color:#fff
+    style Ingestion fill:#1f6feb,stroke:#30363d,color:#fff
+    style Processing fill:#8b5cff,stroke:#30363d,color:#fff
+    style Storage fill:#d29922,stroke:#30363d,color:#fff
+    style Analytics fill:#238636,stroke:#30363d,color:#fff
+    style Output fill:#f85149,stroke:#30363d,color:#fff
