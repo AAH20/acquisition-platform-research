@@ -778,23 +778,21 @@ class TestCrossBorderEndpoint:
             "/cross-border",
             json={
                 "deal": {
-                    "jurisdictions": [
-                        {"code": "US", "name": "United States", "regulatory_body": "SEC", "tax_rate": 0.21},
-                        {"code": "DE", "name": "Germany", "regulatory_body": "BaFin", "tax_rate": 0.30},
-                    ],
+                    "acquirer_country": "US",
+                    "target_country": "DE",
                     "deal_value": 10000000,
-                    "deal_type": "acquisition",
+                    "currency": "EUR",
+                    "industry": "technology",
                 }
             },
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert "filings" in data
-        assert len(data["filings"]) == 10  # 5 per jurisdiction
-        assert data["total_tax"] > 0
-        assert data["hedging_cost"] > 0
-        assert data["integration_timeline"] > 0
-        assert 0.0 <= data["risk_score"] <= 1.0
+        assert 0.0 <= data["currency_risk"] <= 1.0
+        assert 0.0 <= data["regulatory_risk"] <= 1.0
+        assert 0.0 <= data["tax_optimization"] <= 1.0
+        assert 0.0 <= data["cultural_distance"] <= 1.0
+        assert data["timeline_months"] > 0
 
     def test_cross_border_negative_deal_value_returns_422(
         self, client: TestClient
@@ -803,31 +801,36 @@ class TestCrossBorderEndpoint:
             "/cross-border",
             json={
                 "deal": {
-                    "jurisdictions": [
-                        {"code": "US", "name": "United States", "regulatory_body": "SEC", "tax_rate": 0.21}
-                    ],
+                    "acquirer_country": "US",
+                    "target_country": "DE",
                     "deal_value": -1,
-                    "deal_type": "acquisition",
+                    "currency": "EUR",
+                    "industry": "technology",
                 }
             },
         )
         assert resp.status_code == 422
 
-    def test_cross_border_empty_jurisdictions(self, client: TestClient) -> None:
+    def test_cross_border_empty_countries(self, client: TestClient) -> None:
         resp = client.post(
             "/cross-border",
             json={
                 "deal": {
-                    "jurisdictions": [],
+                    "acquirer_country": "",
+                    "target_country": "",
                     "deal_value": 1000000,
-                    "deal_type": "acquisition",
+                    "currency": "",
+                    "industry": "",
                 }
             },
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["filings"] == []
-        assert data["total_tax"] == 0.0
+        assert data["currency_risk"] == 0.0
+        assert data["regulatory_risk"] == 0.0
+        assert data["tax_optimization"] == 0.0
+        assert data["cultural_distance"] == 0.0
+        assert data["timeline_months"] == 0
 
 
 # ---------------------------------------------------------------------------

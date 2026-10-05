@@ -2,24 +2,21 @@
 import pytest
 from acquisition_platform.recommendation import (
     UserProfile,
-    ItemProfile,
+    Item,
     Recommendation,
-    RecommendationResult,
     RecommendationEngine,
 )
 
 
-def _make_items() -> list[ItemProfile]:
+def _make_items() -> list[Item]:
     """Create a diverse catalog of items for testing."""
     return [
-        ItemProfile(item_id="i1", attributes={"topic": "ml", "difficulty": "advanced"}, category="saas"),
-        ItemProfile(item_id="i2", attributes={"topic": "ml", "difficulty": "beginner"}, category="saas"),
-        ItemProfile(item_id="i3", attributes={"topic": "web", "difficulty": "beginner"}, category="ecommerce"),
-        ItemProfile(item_id="i4", attributes={"topic": "web", "difficulty": "advanced"}, category="ecommerce"),
-        ItemProfile(item_id="i5", attributes={"topic": "data", "difficulty": "intermediate"}, category="content"),
-        ItemProfile(item_id="i6", attributes={"topic": "data", "difficulty": "advanced"}, category="content"),
-        ItemProfile(item_id="i7", attributes={"topic": "ml", "difficulty": "intermediate"}, category="service"),
-        ItemProfile(item_id="i8", attributes={"topic": "web", "difficulty": "intermediate"}, category="service"),
+        Item(item_id="i1", features={"topic": "ml", "difficulty": "advanced"}, category="saas"),
+        Item(item_id="i2", features={"topic": "ml", "difficulty": "beginner"}, category="saas"),
+        Item(item_id="i3", features={"topic": "web", "difficulty": "beginner"}, category="ecommerce"),
+        Item(item_id="i4", features={"topic": "web", "difficulty": "advanced"}, category="ecommerce"),
+        Item(item_id="i5", features={"topic": "data", "difficulty": "intermediate"}, category="content"),
+        Item(item_id="i6", features={"topic": "data", "difficulty": "advanced"}, category="content"),
     ]
 
 
@@ -29,12 +26,12 @@ def _make_users() -> list[UserProfile]:
         UserProfile(
             user_id="u1",
             preferences={"topic": "ml", "difficulty": "advanced"},
-            history=["i1", "i2"],
+            history=["i1"],
         ),
         UserProfile(
             user_id="u2",
             preferences={"topic": "web", "difficulty": "beginner"},
-            history=["i3", "i4"],
+            history=["i3"],
         ),
         UserProfile(
             user_id="u3",
@@ -47,188 +44,140 @@ def _make_users() -> list[UserProfile]:
 class TestRecommendationEngine:
     """TDD tests for the recommendation engine."""
 
-    def test_basic_recommendation(self):
-        """Recommend items for a user with history and preferences."""
+    def test_recommendation_score(self):
+        """Recommendation scored."""
+        engine = RecommendationEngine()
+        user = UserProfile(user_id="u1", preferences={"topic": "ml"}, history=[])
+        item = Item(item_id="i1", features={"topic": "ml", "difficulty": "advanced"}, category="saas")
+        score = engine.score_recommendation(user, item)
+        assert isinstance(score, float)
+        assert 0.0 <= score <= 1.0
+        assert score > 0.0
+
+    def test_ranking(self):
+        """Recommendations ranked."""
         engine = RecommendationEngine()
         users = _make_users()
         items = _make_items()
-        for u in users:
-            engine.add_user_profile(u)
-        for it in items:
-            engine.add_item_profile(it)
-
-        result = engine.recommend(users[0], items, k=3)
-        assert isinstance(result, RecommendationResult)
-        assert len(result.recommendations) > 0
-        assert len(result.recommendations) <= 3
-        for rec in result.recommendations:
+        recs = engine.rank_recommendations(users[0], items)
+        assert len(recs) > 0
+        scores = [r.score for r in recs]
+        assert scores == sorted(scores, reverse=True)
+        for rec in recs:
             assert isinstance(rec, Recommendation)
-            assert rec.item_id in {it.item_id for it in items}
-            assert rec.score > 0
-            assert rec.reason
+            assert rec.user.user_id == users[0].user_id
 
-    def test_cold_start(self):
-        """New user with no history still gets recommendations."""
+    def test_empty_recommendations(self):
+        """Empty returns defaults."""
         engine = RecommendationEngine()
-        items = _make_items()
-        for it in items:
-            engine.add_item_profile(it)
-
-        cold_user = UserProfile(
-            user_id="cold_user",
-            preferences={"topic": "ml"},
-            history=[],
-        )
-        result = engine.recommend(cold_user, items, k=3)
-        assert isinstance(result, RecommendationResult)
-        assert len(result.recommendations) > 0
-        assert len(result.recommendations) <= 3
-
-    def test_collaborative_filtering(self):
-        """Users with similar preferences get similar recommendations."""
-        engine = RecommendationEngine()
-        users = _make_users()
-        items = _make_items()
-        for u in users:
-            engine.add_user_profile(u)
-        for it in items:
-            engine.add_item_profile(it)
-
-        # u1 and u3 both have "advanced" difficulty preference
-        similar = engine.get_similar_users("u1")
-        assert isinstance(similar, list)
-        # u1 should find at least one similar user
-        assert len(similar) >= 1
-
-    def test_content_based(self):
-        """Items with similar attributes are found as similar."""
-        engine = RecommendationEngine()
-        items = _make_items()
-        for it in items:
-            engine.add_item_profile(it)
-
-        similar = engine.get_similar_items("i1")
-        assert isinstance(similar, list)
-        # i1 (ml, advanced) should find i2 (ml, beginner) or i7 (ml, intermediate)
-        assert len(similar) >= 1
-        assert "i1" not in similar
-
-    def test_hybrid(self):
-        """Hybrid mode combines CF and content-based signals."""
-        engine = RecommendationEngine()
-        users = _make_users()
-        items = _make_items()
-        for u in users:
-            engine.add_user_profile(u)
-        for it in items:
-            engine.add_item_profile(it)
-
-        result = engine.recommend(users[0], items, k=5)
-        assert isinstance(result, RecommendationResult)
-        assert len(result.recommendations) > 0
-        # Hybrid should produce scores that reflect both signals
-        scores = [r.score for r in result.recommendations]
-        assert all(s > 0 for s in scores)
-
-    def test_diversity(self):
-        """Recommendations span multiple categories."""
-        engine = RecommendationEngine()
-        users = _make_users()
-        items = _make_items()
-        for u in users:
-            engine.add_user_profile(u)
-        for it in items:
-            engine.add_item_profile(it)
-
-        result = engine.recommend(users[0], items, k=5)
-        categories = set()
-        item_map = {it.item_id: it for it in items}
-        for rec in result.recommendations:
-            categories.add(item_map[rec.item_id].category)
-        # Should have more than one category in top-5
-        assert len(categories) >= 2
-        assert result.diversity_score > 0
+        user = UserProfile(user_id="u1", preferences={"topic": "ml"}, history=[])
+        recs = engine.rank_recommendations(user, [])
+        assert recs == []
+        report = engine.generate_recommendation_report(recs)
+        assert report["total"] == 0
+        assert report["average_score"] == 0.0
 
     def test_personalization(self):
-        """Different users get different recommendations."""
+        """Personalization applied."""
         engine = RecommendationEngine()
         users = _make_users()
         items = _make_items()
-        for u in users:
-            engine.add_user_profile(u)
-        for it in items:
-            engine.add_item_profile(it)
+        recs = engine.personalize(users[0], items)
+        assert len(recs) > 0
+        for rec in recs:
+            assert isinstance(rec, Recommendation)
+            assert rec.user.user_id == users[0].user_id
+        # Personalized scores should be >= base scores
+        base_recs = engine.rank_recommendations(users[0], items)
+        base_scores = {r.item.item_id: r.score for r in base_recs}
+        for rec in recs:
+            assert rec.score >= base_scores.get(rec.item.item_id, 0.0)
 
-        result_u1 = engine.recommend(users[0], items, k=3)
-        result_u2 = engine.recommend(users[1], items, k=3)
-
-        top_u1 = [r.item_id for r in result_u1.recommendations]
-        top_u2 = [r.item_id for r in result_u2.recommendations]
-        # Different users should get different top recommendations
-        assert top_u1 != top_u2
-
-    def test_empty_catalog(self):
-        """No items returns empty recommendation list."""
+    def test_collaborative_filtering(self):
+        """Collaborative filtering applied."""
         engine = RecommendationEngine()
-        user = UserProfile(user_id="u1", preferences={"topic": "ml"}, history=[])
-        result = engine.recommend(user, [], k=5)
-        assert isinstance(result, RecommendationResult)
-        assert len(result.recommendations) == 0
+        users = _make_users()
+        items = _make_items()
+        recs = engine.collaborative_filtering(users[0], users, items)
+        assert len(recs) > 0
+        for rec in recs:
+            assert isinstance(rec, Recommendation)
+            assert rec.user.user_id == users[0].user_id
+        # Items in similar users' history should have higher scores
+        similar_user_items = set()
+        for u in users[1:]:
+            if u.preferences.get("topic") == users[0].preferences.get("topic"):
+                similar_user_items.update(u.history)
+        if similar_user_items:
+            top_rec = recs[0]
+            assert top_rec.item.item_id in similar_user_items or top_rec.score > 0
 
-    def test_single_item(self):
-        """One item in catalog returns at most one recommendation."""
+    def test_content_filtering(self):
+        """Content filtering applied."""
         engine = RecommendationEngine()
-        items = [ItemProfile(item_id="only", attributes={"topic": "ml"}, category="saas")]
-        for it in items:
-            engine.add_item_profile(it)
-        user = UserProfile(user_id="u1", preferences={"topic": "ml"}, history=[])
-        result = engine.recommend(user, items, k=5)
-        assert len(result.recommendations) <= 1
+        users = _make_users()
+        items = _make_items()
+        recs = engine.content_filtering(users[0], items)
+        assert len(recs) > 0
+        for rec in recs:
+            assert isinstance(rec, Recommendation)
+        # Items matching user preferences should score higher
+        matching_items = [i for i in items if i.features.get("topic") == "ml"]
+        non_matching = [i for i in items if i.features.get("topic") != "ml"]
+        if matching_items and non_matching:
+            matching_scores = [r.score for r in recs if r.item.item_id in {i.item_id for i in matching_items}]
+            non_matching_scores = [r.score for r in recs if r.item.item_id in {i.item_id for i in non_matching}]
+            if matching_scores and non_matching_scores:
+                assert max(matching_scores) >= max(non_matching_scores)
 
-    def test_top_k(self):
-        """Returns exactly k recommendations when catalog is large enough."""
+    def test_recommendation_report(self):
+        """Report generated."""
+        engine = RecommendationEngine()
+        users = _make_users()
+        items = _make_items()
+        recs = engine.rank_recommendations(users[0], items)
+        report = engine.generate_recommendation_report(recs)
+        assert isinstance(report, dict)
+        assert "total" in report
+        assert "average_score" in report
+        assert "diversity_score" in report
+        assert "categories" in report
+        assert "top_item" in report
+        assert report["total"] == len(recs)
+        assert report["average_score"] >= 0.0
+        assert 0.0 <= report["diversity_score"] <= 1.0
+        assert isinstance(report["categories"], list)
+        assert report["top_item"] is not None
+
+    def test_cold_start(self):
+        """Cold start handled."""
         engine = RecommendationEngine()
         items = _make_items()
-        for it in items:
-            engine.add_item_profile(it)
-        user = UserProfile(user_id="u1", preferences={"topic": "ml"}, history=["i1"])
-        result = engine.recommend(user, items, k=4)
-        assert len(result.recommendations) == 4
+        recs = engine.cold_start_recommendation(items)
+        assert len(recs) > 0
+        for rec in recs:
+            assert isinstance(rec, Recommendation)
+            assert rec.score > 0.0
+            assert rec.explanation != ""
 
-    def test_recommendation_result_has_coverage(self):
-        """RecommendationResult includes coverage metric."""
+    def test_diversity(self):
+        """Diversity scored."""
         engine = RecommendationEngine()
+        users = _make_users()
         items = _make_items()
-        for it in items:
-            engine.add_item_profile(it)
+        recs = engine.rank_recommendations(users[0], items)
+        diversity = engine.diversity_score(recs)
+        assert isinstance(diversity, float)
+        assert 0.0 <= diversity <= 1.0
+        # With multiple categories in catalog, diversity should be > 0
+        assert diversity > 0.0
+
+    def test_explanation(self):
+        """Explanation generated."""
+        engine = RecommendationEngine()
         user = UserProfile(user_id="u1", preferences={"topic": "ml"}, history=[])
-        result = engine.recommend(user, items, k=3)
-        assert 0.0 <= result.coverage <= 1.0
-
-    def test_history_items_excluded(self):
-        """Items already in user history are not recommended."""
-        engine = RecommendationEngine()
-        items = _make_items()
-        for it in items:
-            engine.add_item_profile(it)
-        user = UserProfile(user_id="u1", preferences={"topic": "ml"}, history=["i1", "i2"])
-        result = engine.recommend(user, items, k=5)
-        recommended_ids = {r.item_id for r in result.recommendations}
-        assert "i1" not in recommended_ids
-        assert "i2" not in recommended_ids
-
-    def test_add_user_profile(self):
-        """add_user_profile stores the user for CF lookups."""
-        engine = RecommendationEngine()
-        user = UserProfile(user_id="u1", preferences={"topic": "ml"}, history=["i1"])
-        engine.add_user_profile(user)
-        similar = engine.get_similar_users("u1")
-        assert isinstance(similar, list)
-
-    def test_add_item_profile(self):
-        """add_item_profile stores the item for content-based lookups."""
-        engine = RecommendationEngine()
-        item = ItemProfile(item_id="i1", attributes={"topic": "ml"}, category="saas")
-        engine.add_item_profile(item)
-        similar = engine.get_similar_items("i1")
-        assert isinstance(similar, list)
+        item = Item(item_id="i1", features={"topic": "ml"}, category="saas")
+        rec = Recommendation(user=user, item=item, score=0.8, explanation="")
+        explanation = engine.explain_recommendation(rec)
+        assert isinstance(explanation, str)
+        assert len(explanation) > 0

@@ -9,6 +9,7 @@ This module implements a recommendation engine that blends:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 from acquisition_platform.serialization import SerializableMixin
 from acquisition_platform.caching import cached
@@ -49,18 +50,45 @@ class ItemProfile(SerializableMixin):
 
 
 @dataclass
+class Item(SerializableMixin):
+    """An item with features and category metadata.
+
+    Attributes:
+        item_id: Unique identifier for the item.
+        features: Dict of feature key-value pairs (e.g., {"topic": "ml", "difficulty": "advanced"}).
+        category: Category label for the item (e.g., "saas", "ecommerce").
+    """
+
+    item_id: str
+    features: dict[str, str] = field(default_factory=dict)
+    category: str = ""
+
+
+@dataclass
 class Recommendation(SerializableMixin):
     """A single recommendation with score and explanation.
 
     Attributes:
-        item_id: The recommended item's ID.
+        user: The user this recommendation is for.
+        item: The recommended item.
         score: Relevance score in [0.0, 1.0].
-        reason: Human-readable explanation for the recommendation.
+        explanation: Human-readable explanation for the recommendation.
     """
 
-    item_id: str
+    user: UserProfile
+    item: Item
     score: float
-    reason: str
+    explanation: str = ""
+
+    @property
+    def item_id(self) -> str:
+        """Backward-compatible access to the recommended item's ID."""
+        return self.item.item_id
+
+    @property
+    def reason(self) -> str:
+        """Backward-compatible access to the explanation."""
+        return self.explanation
 
 
 @dataclass
@@ -219,7 +247,12 @@ class RecommendationEngine:
 
         # Build recommendations
         recommendations = [
-            Recommendation(item_id=item.item_id, score=round(score, 4), reason=reason)
+            Recommendation(
+                user=user,
+                item=Item(item_id=item.item_id, features=item.attributes, category=item.category),
+                score=round(score, 4),
+                explanation=reason,
+            )
             for item, score, reason in selected
         ]
 
@@ -391,3 +424,220 @@ class RecommendationEngine:
                 covered.add(item.category)
 
         return len(covered) / len(all_categories) if all_categories else 0.0
+
+    def score_recommendation(self, user: UserProfile, item: Item) -> float:
+        """Score a single item for a user based on content matching.
+
+        Args:
+            user: The target user profile.
+            item: The item to score.
+
+        Returns:
+            Score in [0.0, 1.0].
+        """
+        if not user.preferences or not item.features:
+            return 0.0
+        matches = sum(
+            1 for key, value in user.preferences.items()
+            if item.features.get(key) == value
+        )
+        return matches / len(user.preferences)
+
+    def rank_recommendations(self, user: UserProfile, items: list[Item]) -> list[Recommendation]:
+        """Rank all items for a user by score.
+
+        Args:
+            user: The target user profile.
+            items: Candidate items.
+
+        Returns:
+            List of Recommendation objects sorted by score descending.
+        """
+        scored: list[tuple[Item, float]] = []
+        for item in items:
+            score = self.score_recommendation(user, item)
+            scored.append((item, score))
+        scored.sort(key=lambda x: x[1], reverse=True)
+        return [
+            Recommendation(user=user, item=item, score=score, explanation="")
+            for item, score in scored
+        ]
+
+    def personalize(self, user: UserProfile, items: list[Item]) -> list[Recommendation]:
+        """Generate personalized recommendations with boosted scores.
+
+        Args:
+            user: The target user profile.
+            items: Candidate items.
+
+        Returns:
+            List of Recommendation objects with personalized scores.
+        """
+        base_recs = self.rank_recommendations(user, items)
+        history_set = set(user.history)
+        personalized: list[Recommendation] = []
+        for rec in base_recs:
+            boost = 0.0
+            if rec.item.item_id in history_set:
+                boost = 0.1
+            # Boost items in categories the user has shown interest in
+            for hist_id in user.history:
+                # Find category of history item from the items list
+                for item in items:
+                    if item.item_id == hist_id and item.category == rec.item.category:
+                        boost += 0.05
+                        break
+            new_score = min(rec.score + boost, 1.0)
+            personalized.append(Recommendation(
+                user=user, item=rec.item, score=new_score, explanation=""
+            ))
+        personalized.sort(key=lambda r: r.score, reverse=True)
+        return personalized
+
+    def collaborative_filtering(
+        self, user: UserProfile, users: list[UserProfile], items: list[Item]
+    ) -> list[Recommendation]:
+        """Generate recommendations using collaborative filtering.
+
+        Args:
+            user: The target user profile.
+            users: All user profiles for similarity computation.
+            items: Candidate items.
+
+        Returns:
+            List of Recommendation objects based on similar users' preferences.
+        """
+        # Find similar users based on preference overlap
+        similar_users: list[tuple[UserProfile, float]] = []
+        for other in users:
+            if other.user_id == user.user_id:
+                continue
+            sim = self._preference_similarity(user.preferences, other.preferences)
+            if sim > 0:
+                similar_users.append((other, sim))
+
+        if not similar_users:
+            return self.rank_recommendations(user, items)
+
+        # Score items based on similar users' history and preferences
+        scored: list[tuple[Item, float]] = []
+        for item in items:
+            score = 0.0
+            for sim_user, sim_weight in similar_users:
+                if item.item_id in sim_user.history:
+                    score += sim_weight
+                # Also consider attribute overlap with similar user preferences
+                attr_overlap = self._attribute_similarity(sim_user.preferences, item.features)
+                score += attr_overlap * sim_weight * 0.5
+            scored.append((item, min(score, 1.0)))
+
+        scored.sort(key=lambda x: x[1], reverse=True)
+        return [
+            Recommendation(user=user, item=item, score=score, explanation="")
+            for item, score in scored
+        ]
+
+    def content_filtering(self, user: UserProfile, items: list[Item]) -> list[Recommendation]:
+        """Generate recommendations using content-based filtering.
+
+        Args:
+            user: The target user profile.
+            items: Candidate items.
+
+        Returns:
+            List of Recommendation objects based on content matching.
+        """
+        return self.rank_recommendations(user, items)
+
+    def cold_start_recommendation(self, items: list[Item]) -> list[Recommendation]:
+        """Generate recommendations for a new user with no history.
+
+        Args:
+            items: Candidate items.
+
+        Returns:
+            List of Recommendation objects with default scores.
+        """
+        default_user = UserProfile(user_id="cold_start", preferences={}, history=[])
+        recs: list[Recommendation] = []
+        for item in items:
+            # Give a baseline score with slight preference for diversity
+            score = 0.5
+            recs.append(Recommendation(
+                user=default_user,
+                item=item,
+                score=score,
+                explanation=f"Popular in {item.category}",
+            ))
+        return recs
+
+    def diversity_score(self, recommendations: list[Recommendation]) -> float:
+        """Compute diversity score as fraction of distinct categories.
+
+        Args:
+            recommendations: List of recommendations to evaluate.
+
+        Returns:
+            Diversity score in [0.0, 1.0].
+        """
+        if not recommendations:
+            return 0.0
+        categories = {rec.item.category for rec in recommendations}
+        return len(categories) / len(recommendations)
+
+    def explain_recommendation(self, recommendation: Recommendation) -> str:
+        """Generate a human-readable explanation for a recommendation.
+
+        Args:
+            recommendation: The recommendation to explain.
+
+        Returns:
+            Explanation string.
+        """
+        user = recommendation.user
+        item = recommendation.item
+        score = recommendation.score
+
+        if not user.preferences:
+            return f"Recommended for discovery in {item.category}"
+
+        matching = [
+            f"{k}={v}" for k, v in user.preferences.items()
+            if item.features.get(k) == v
+        ]
+        if matching:
+            return f"Matches your preferences: {', '.join(matching)}"
+        elif score > 0.3:
+            return f"Popular with users similar to you in {item.category}"
+        else:
+            return f"Recommended for discovery in {item.category}"
+
+    def generate_recommendation_report(self, recommendations: list[Recommendation]) -> dict[str, Any]:
+        """Generate a summary report for a list of recommendations.
+
+        Args:
+            recommendations: The recommendations to report on.
+
+        Returns:
+            Dict with report metrics.
+        """
+        if not recommendations:
+            return {
+                "total": 0,
+                "average_score": 0.0,
+                "diversity_score": 0.0,
+                "categories": [],
+                "top_item": None,
+            }
+
+        scores = [r.score for r in recommendations]
+        categories = list({r.item.category for r in recommendations})
+        top_item = max(recommendations, key=lambda r: r.score)
+
+        return {
+            "total": len(recommendations),
+            "average_score": sum(scores) / len(scores),
+            "diversity_score": self.diversity_score(recommendations),
+            "categories": categories,
+            "top_item": top_item.item.item_id,
+        }

@@ -5,6 +5,9 @@ from acquisition_platform.due_diligence import (
     Reviewer,
     DueDiligenceSchedule,
     DueDiligenceScheduler,
+    DDFactor,
+    DDResult,
+    DueDiligenceAnalyzer,
 )
 
 
@@ -191,3 +194,134 @@ class TestDueDiligenceScheduler:
         ]
         schedule = scheduler.schedule(tasks, reviewers)
         assert schedule.reviewer_utilization["r1"] == 6.0
+
+
+class TestDueDiligenceAnalyzer:
+    """TDD tests for the due diligence analyzer."""
+
+    def test_dd_score(self):
+        """Due diligence score calculated as weighted average."""
+        analyzer = DueDiligenceAnalyzer()
+        factors = [
+            DDFactor(name="Revenue Quality", category="financial", score=8.0, weight=2.0, status="pass"),
+            DDFactor(name="Margin Stability", category="financial", score=6.0, weight=1.0, status="pass"),
+        ]
+        score = analyzer.overall_score(factors)
+        expected = (8.0 * 2.0 + 6.0 * 1.0) / 3.0
+        assert score == pytest.approx(expected)
+
+    def test_financial_dd(self):
+        """Financial DD scored from financial-category factors only."""
+        analyzer = DueDiligenceAnalyzer()
+        factors = [
+            DDFactor(name="Revenue Quality", category="financial", score=8.0, weight=1.0, status="pass"),
+            DDFactor(name="Margin Stability", category="financial", score=6.0, weight=1.0, status="pass"),
+            DDFactor(name="Litigation", category="legal", score=3.0, weight=1.0, status="flagged"),
+        ]
+        assert analyzer.financial_dd(factors) == pytest.approx(7.0)
+        assert analyzer.legal_dd(factors) == pytest.approx(3.0)
+
+    def test_legal_dd(self):
+        """Legal DD scored from legal-category factors only."""
+        analyzer = DueDiligenceAnalyzer()
+        factors = [
+            DDFactor(name="Litigation", category="legal", score=3.0, weight=1.0, status="flagged"),
+            DDFactor(name="IP Ownership", category="legal", score=7.0, weight=2.0, status="pass"),
+            DDFactor(name="Code Quality", category="technical", score=9.0, weight=1.0, status="pass"),
+        ]
+        score = analyzer.legal_dd(factors)
+        assert score == pytest.approx((3.0 * 1.0 + 7.0 * 2.0) / 3.0)
+
+    def test_technical_dd(self):
+        """Technical DD scored from technical-category factors only."""
+        analyzer = DueDiligenceAnalyzer()
+        factors = [
+            DDFactor(name="Code Quality", category="technical", score=9.0, weight=1.0, status="pass"),
+            DDFactor(name="Tech Debt", category="technical", score=5.0, weight=1.0, status="pass"),
+            DDFactor(name="Revenue Quality", category="financial", score=8.0, weight=1.0, status="pass"),
+        ]
+        assert analyzer.technical_dd(factors) == pytest.approx(7.0)
+
+    def test_empty_dd(self):
+        """Empty DD returns defaults."""
+        analyzer = DueDiligenceAnalyzer()
+        assert analyzer.overall_score([]) == 0.0
+        assert analyzer.financial_dd([]) == 0.0
+        assert analyzer.legal_dd([]) == 0.0
+        assert analyzer.technical_dd([]) == 0.0
+        report = analyzer.generate_dd_report([])
+        assert report.factors == []
+        assert report.overall_score == 0.0
+        assert report.risk_level == "critical"
+        assert isinstance(report.recommendation, str) and report.recommendation
+        assert isinstance(report.timeline_days, int) and report.timeline_days > 0
+
+    def test_dd_risk(self):
+        """DD risk assessed from overall score."""
+        analyzer = DueDiligenceAnalyzer()
+        assert analyzer.risk_level(9.0) == "low"
+        assert analyzer.risk_level(7.0) == "low"
+        assert analyzer.risk_level(5.0) == "medium"
+        assert analyzer.risk_level(3.0) == "high"
+        assert analyzer.risk_level(0.0) == "critical"
+
+    def test_dd_report(self):
+        """Report generated with all DD fields."""
+        analyzer = DueDiligenceAnalyzer()
+        factors = [
+            DDFactor(name="Revenue Quality", category="financial", score=8.0, weight=1.0, status="pass"),
+            DDFactor(name="Litigation", category="legal", score=4.0, weight=1.0, status="flagged"),
+            DDFactor(name="Code Quality", category="technical", score=6.0, weight=1.0, status="pass"),
+        ]
+        report = analyzer.generate_dd_report(factors)
+        assert isinstance(report, DDResult)
+        assert len(report.factors) == 3
+        assert report.overall_score == pytest.approx(6.0)
+        assert report.risk_level in ("low", "medium", "high", "critical")
+        assert isinstance(report.recommendation, str) and report.recommendation
+        assert isinstance(report.timeline_days, int) and report.timeline_days > 0
+
+    def test_dd_checklist(self):
+        """Checklist generated from factors."""
+        analyzer = DueDiligenceAnalyzer()
+        factors = [
+            DDFactor(name="Revenue Quality", category="financial", score=8.0, weight=1.0, status="pass"),
+            DDFactor(name="Litigation", category="legal", score=4.0, weight=1.0, status="flagged"),
+        ]
+        checklist = analyzer.generate_checklist(factors)
+        assert isinstance(checklist, list)
+        assert len(checklist) == 2
+        assert all(isinstance(item, str) for item in checklist)
+        assert any("Revenue Quality" in item for item in checklist)
+        assert any("Litigation" in item for item in checklist)
+
+    def test_dd_timeline(self):
+        """Timeline generated in days."""
+        analyzer = DueDiligenceAnalyzer()
+        factors = [
+            DDFactor(name="F1", category="financial", score=8.0, weight=1.0, status="pass"),
+            DDFactor(name="F2", category="legal", score=4.0, weight=1.0, status="fail"),
+        ]
+        timeline = analyzer.dd_timeline(factors)
+        assert isinstance(timeline, int)
+        assert timeline > 0
+
+    def test_dd_recommendation(self):
+        """Recommendation generated from score and risk."""
+        analyzer = DueDiligenceAnalyzer()
+        rec_low = analyzer.dd_recommendation(9.0, "low")
+        rec_critical = analyzer.dd_recommendation(1.0, "critical")
+        assert isinstance(rec_low, str) and rec_low
+        assert isinstance(rec_critical, str) and rec_critical
+        assert rec_low != rec_critical
+
+    def test_add_factor(self):
+        """add_factor returns a validated DDFactor."""
+        analyzer = DueDiligenceAnalyzer()
+        factor = analyzer.add_factor("Revenue Quality", "financial", 8.0, 1.0, "pass")
+        assert isinstance(factor, DDFactor)
+        assert factor.name == "Revenue Quality"
+        assert factor.category == "financial"
+        assert factor.score == 8.0
+        assert factor.weight == 1.0
+        assert factor.status == "pass"

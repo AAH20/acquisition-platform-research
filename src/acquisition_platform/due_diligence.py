@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from acquisition_platform.exceptions import ValidationError
+from acquisition_platform.exceptions import ValidationError, InvalidRangeError
 from acquisition_platform.serialization import SerializableMixin
 
 from acquisition_platform.observability import get_logger, log_execution_time, log_module_call
@@ -335,3 +335,312 @@ class DueDiligenceScheduler:
 
         # After last task
         return max(earliest, timeline[-1][1])
+
+
+# ----------------------------------------------------------------------
+# Due diligence analysis (scoring, risk, reporting)
+# ----------------------------------------------------------------------
+
+# Risk level thresholds for due diligence scores (0-10, higher = better)
+_DD_LOW_THRESHOLD = 7.0
+_DD_MEDIUM_THRESHOLD = 4.0
+_DD_HIGH_THRESHOLD = 2.0
+
+# Base timeline (days) for a due diligence engagement
+_DD_BASE_TIMELINE_DAYS = 30
+# Additional days per factor reviewed
+_DD_DAYS_PER_FACTOR = 5
+# Extra days required when any factor has failed
+_DD_FAIL_OVERHEAD_DAYS = 10
+
+
+@dataclass
+class DDFactor(SerializableMixin):
+    """A single due diligence factor.
+
+    Attributes:
+        name: Human-readable factor name (e.g. "Revenue Quality").
+        category: Due diligence category (e.g. "financial", "legal",
+            "technical").
+        score: Factor score on a 0-10 scale (higher = better).
+        weight: Importance weight used in weighted aggregation.
+        status: Review status (e.g. "pass", "flagged", "fail").
+    """
+
+    name: str
+    category: str
+    score: float
+    weight: float
+    status: str
+
+
+@dataclass
+class DDResult(SerializableMixin):
+    """Complete due diligence analysis result.
+
+    Attributes:
+        factors: List of individual factors assessed.
+        overall_score: Weighted aggregate score (0-10).
+        risk_level: Classification: "low", "medium", "high", or "critical".
+        recommendation: Human-readable recommendation string.
+        timeline_days: Estimated due diligence timeline in days.
+    """
+
+    factors: list[DDFactor]
+    overall_score: float
+    risk_level: str
+    recommendation: str
+    timeline_days: int
+
+
+class DueDiligenceAnalyzer:
+    """Due diligence scoring and reporting engine.
+
+    Scores individual due diligence factors by category (financial,
+    legal, technical), aggregates them into an overall score, classifies
+    risk, and generates checklists, timelines, and recommendations.
+    """
+
+    def __init__(self) -> None:
+        self._factors: list[DDFactor] = []
+        self._reports: list[DDResult] = []
+
+    # ------------------------------------------------------------------
+    # Factor management
+    # ------------------------------------------------------------------
+
+    @log_execution_time(logger)
+    def add_factor(
+        self,
+        name: str,
+        category: str,
+        score: float,
+        weight: float,
+        status: str,
+    ) -> DDFactor:
+        """Create and store a validated DDFactor.
+
+        Args:
+            name: Human-readable factor name.
+            category: Due diligence category (e.g. "financial").
+            score: Factor score (0-10).
+            weight: Importance weight (0-1).
+            status: Review status (e.g. "pass", "flagged", "fail").
+
+        Returns:
+            The created DDFactor instance.
+
+        Raises:
+            ValidationError: If name/category/status is empty.
+            InvalidRangeError: If score or weight is outside valid range.
+        """
+        if not name or not name.strip():
+            raise ValidationError("DD factor name cannot be empty")
+        if not category or not category.strip():
+            raise ValidationError("DD factor category cannot be empty")
+        if not status or not status.strip():
+            raise ValidationError("DD factor status cannot be empty")
+        if not 0 <= score <= 10:
+            raise InvalidRangeError(f"Score must be between 0 and 10, got {score}")
+        if not 0 <= weight <= 1:
+            raise InvalidRangeError(f"Weight must be between 0 and 1, got {weight}")
+        factor = DDFactor(
+            name=name.strip(),
+            category=category.strip(),
+            score=float(score),
+            weight=float(weight),
+            status=status.strip(),
+        )
+        self._factors.append(factor)
+        return factor
+
+    # ------------------------------------------------------------------
+    # Scoring
+    # ------------------------------------------------------------------
+
+    @log_execution_time(logger)
+    def _category_score(self, factors: list[DDFactor], category: str) -> float:
+        """Weighted average score for factors in a category (0.0 if none)."""
+        matching = [f for f in factors if f.category.lower() == category.lower()]
+        if not matching:
+            return 0.0
+        total_weight = sum(f.weight for f in matching)
+        if total_weight == 0:
+            return 0.0
+        return sum(f.score * f.weight for f in matching) / total_weight
+
+    @log_execution_time(logger)
+    def financial_dd(self, factors: list[DDFactor]) -> float:
+        """Score financial due diligence factors.
+
+        Args:
+            factors: Factors to score; only "financial" category counts.
+
+        Returns:
+            Weighted average score (0-10). 0.0 if no financial factors.
+        """
+        return self._category_score(factors, "financial")
+
+    @log_execution_time(logger)
+    def legal_dd(self, factors: list[DDFactor]) -> float:
+        """Score legal due diligence factors.
+
+        Args:
+            factors: Factors to score; only "legal" category counts.
+
+        Returns:
+            Weighted average score (0-10). 0.0 if no legal factors.
+        """
+        return self._category_score(factors, "legal")
+
+    @log_execution_time(logger)
+    def technical_dd(self, factors: list[DDFactor]) -> float:
+        """Score technical due diligence factors.
+
+        Args:
+            factors: Factors to score; only "technical" category counts.
+
+        Returns:
+            Weighted average score (0-10). 0.0 if no technical factors.
+        """
+        return self._category_score(factors, "technical")
+
+    @log_execution_time(logger)
+    def overall_score(self, factors: list[DDFactor]) -> float:
+        """Compute the weighted overall due diligence score.
+
+        Args:
+            factors: All factors to aggregate.
+
+        Returns:
+            Weighted average score (0-10). 0.0 for an empty list.
+        """
+        if not factors:
+            return 0.0
+        total_weight = sum(f.weight for f in factors)
+        if total_weight == 0:
+            return 0.0
+        return sum(f.score * f.weight for f in factors) / total_weight
+
+    # ------------------------------------------------------------------
+    # Risk classification
+    # ------------------------------------------------------------------
+
+    @log_execution_time(logger)
+    def risk_level(self, score: float) -> str:
+        """Classify a due diligence score into a risk level.
+
+        Args:
+            score: Due diligence score (0-10, higher = better).
+
+        Returns:
+            One of "low", "medium", "high", or "critical".
+
+        Raises:
+            InvalidRangeError: If score is outside [0, 10].
+        """
+        if not 0 <= score <= 10:
+            raise InvalidRangeError(f"Score must be between 0 and 10, got {score}")
+        if score >= _DD_LOW_THRESHOLD:
+            return "low"
+        if score >= _DD_MEDIUM_THRESHOLD:
+            return "medium"
+        if score >= _DD_HIGH_THRESHOLD:
+            return "high"
+        return "critical"
+
+    # ------------------------------------------------------------------
+    # Reporting
+    # ------------------------------------------------------------------
+
+    @log_execution_time(logger)
+    def generate_checklist(self, factors: list[DDFactor]) -> list[str]:
+        """Generate a review checklist from due diligence factors.
+
+        Args:
+            factors: Factors to include in the checklist.
+
+        Returns:
+            List of checklist item strings, one per factor.
+        """
+        checklist: list[str] = []
+        for f in factors:
+            checklist.append(
+                f"[{f.status.upper()}] {f.name} ({f.category}): "
+                f"verify documentation and confirm score {f.score}/10"
+            )
+        return checklist
+
+    @log_execution_time(logger)
+    def dd_timeline(self, factors: list[DDFactor]) -> int:
+        """Estimate the due diligence timeline in days.
+
+        Args:
+            factors: Factors to be reviewed.
+
+        Returns:
+            Estimated timeline in days (always positive).
+        """
+        days = _DD_BASE_TIMELINE_DAYS + _DD_DAYS_PER_FACTOR * len(factors)
+        if any(f.status.lower() == "fail" for f in factors):
+            days += _DD_FAIL_OVERHEAD_DAYS
+        return days
+
+    @log_execution_time(logger)
+    def dd_recommendation(self, score: float, risk: str) -> str:
+        """Generate a recommendation from score and risk level.
+
+        Args:
+            score: Overall due diligence score (0-10).
+            risk: Risk level ("low", "medium", "high", or "critical").
+
+        Returns:
+            Human-readable recommendation string.
+
+        Raises:
+            InvalidRangeError: If score is outside [0, 10].
+        """
+        if not 0 <= score <= 10:
+            raise InvalidRangeError(f"Score must be between 0 and 10, got {score}")
+        risk_lower = risk.lower()
+        if risk_lower == "low":
+            return (
+                "Proceed with acquisition — due diligence risk is low "
+                f"(score {score:.1f}/10)."
+            )
+        if risk_lower == "medium":
+            return (
+                "Proceed with caution — address medium-risk findings "
+                f"(score {score:.1f}/10) before closing."
+            )
+        if risk_lower == "high":
+            return (
+                "High risk — renegotiate terms or require remediation "
+                f"(score {score:.1f}/10) before proceeding."
+            )
+        return (
+            "Do not proceed — critical due diligence failures detected "
+            f"(score {score:.1f}/10)."
+        )
+
+    @log_execution_time(logger)
+    def generate_dd_report(self, factors: list[DDFactor]) -> DDResult:
+        """Generate a complete due diligence report.
+
+        Args:
+            factors: Factors to include in the report.
+
+        Returns:
+            A DDResult with score, risk level, recommendation, and timeline.
+        """
+        score = self.overall_score(factors)
+        risk = self.risk_level(score)
+        report = DDResult(
+            factors=list(factors),
+            overall_score=score,
+            risk_level=risk,
+            recommendation=self.dd_recommendation(score, risk),
+            timeline_days=self.dd_timeline(factors),
+        )
+        self._reports.append(report)
+        return report

@@ -55,9 +55,8 @@ from acquisition_platform.due_diligence import (
     Reviewer,
 )
 from acquisition_platform.cross_border import (
+    CrossBorderAnalyzer,
     CrossBorderDeal,
-    CrossBorderOptimizer,
-    Jurisdiction,
 )
 from acquisition_platform.recommendation import (
     ItemProfile,
@@ -423,36 +422,24 @@ class DueDiligenceResponse(BaseModel):
     reviewer_utilization: dict[str, float]
 
 
-class JurisdictionRequest(BaseModel):
-    code: str
-    name: str
-    regulatory_body: str
-    tax_rate: float = Field(ge=0.0)
-
-
 class CrossBorderDealRequest(BaseModel):
-    jurisdictions: list[JurisdictionRequest]
+    acquirer_country: str
+    target_country: str
     deal_value: float = Field(ge=0)
-    deal_type: str
+    currency: str
+    industry: str
 
 
 class CrossBorderRequest(BaseModel):
     deal: CrossBorderDealRequest
 
 
-class RegulatoryFilingResponse(BaseModel):
-    jurisdiction: str
-    filing_type: str
-    deadline: float
-    dependencies: list[str]
-
-
 class CrossBorderResponse(BaseModel):
-    filings: list[RegulatoryFilingResponse]
-    total_tax: float
-    hedging_cost: float
-    integration_timeline: float
-    risk_score: float
+    currency_risk: float
+    regulatory_risk: float
+    tax_optimization: float
+    cultural_distance: float
+    timeline_months: int
 
 
 class UserProfileRequest(BaseModel):
@@ -826,32 +813,22 @@ def due_diligence(request: DueDiligenceRequest) -> DueDiligenceResponse:
 
 @app.post("/cross-border", response_model=CrossBorderResponse, tags=["engines"])
 def cross_border(request: CrossBorderRequest) -> CrossBorderResponse:
-    """Optimize cross-border M&A transaction."""
-    jurisdictions = [
-        Jurisdiction(code=j.code, name=j.name, regulatory_body=j.regulatory_body, tax_rate=j.tax_rate)
-        for j in request.deal.jurisdictions
-    ]
+    """Analyze cross-border M&A transaction."""
     deal = CrossBorderDeal(
-        jurisdictions=jurisdictions,
+        acquirer_country=request.deal.acquirer_country,
+        target_country=request.deal.target_country,
         deal_value=request.deal.deal_value,
-        deal_type=request.deal.deal_type,
+        currency=request.deal.currency,
+        industry=request.deal.industry,
     )
-    optimizer = CrossBorderOptimizer()
-    result = optimizer.optimize(deal)
+    analyzer = CrossBorderAnalyzer()
+    result = analyzer.generate_cross_border_report(deal)
     return CrossBorderResponse(
-        filings=[
-            RegulatoryFilingResponse(
-                jurisdiction=f.jurisdiction,
-                filing_type=f.filing_type,
-                deadline=f.deadline,
-                dependencies=f.dependencies,
-            )
-            for f in result.filings
-        ],
-        total_tax=result.total_tax,
-        hedging_cost=result.hedging_cost,
-        integration_timeline=result.integration_timeline,
-        risk_score=result.risk_score,
+        currency_risk=result.currency_risk,
+        regulatory_risk=result.regulatory_risk,
+        tax_optimization=result.tax_optimization,
+        cultural_distance=result.cultural_distance,
+        timeline_months=result.timeline_months,
     )
 
 

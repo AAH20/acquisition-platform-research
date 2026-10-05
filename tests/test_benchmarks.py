@@ -24,9 +24,8 @@ from acquisition_platform.due_diligence import (
     DueDiligenceScheduler,
 )
 from acquisition_platform.cross_border import (
-    Jurisdiction,
+    CrossBorderAnalyzer,
     CrossBorderDeal,
-    CrossBorderOptimizer,
 )
 from acquisition_platform.recommendation import (
     UserProfile,
@@ -165,20 +164,19 @@ def _make_reviewers(n: int, seed: int = 42) -> list[Reviewer]:
     return reviewers
 
 
-def _make_jurisdictions(n: int) -> list[Jurisdiction]:
-    """Generate n jurisdictions for cross-border optimization."""
-    codes = ["US", "DE", "UK", "FR", "JP", "CN", "BR", "IN", "AU", "CA"]
-    names = [
-        "United States", "Germany", "United Kingdom", "France", "Japan",
-        "China", "Brazil", "India", "Australia", "Canada",
-    ]
-    bodies = ["CFIUS", "BMWK", "CMA", "FCA", "JFTC", "MOFCOM", "CADE", "CCI", "ACCC", "CBSA"]
+def _make_deals(n: int) -> list[CrossBorderDeal]:
+    """Generate n cross-border deals for benchmarking."""
+    acquirers = ["US", "DE", "UK", "FR", "JP", "CN", "BR", "IN", "AU", "CA"]
+    targets = ["DE", "US", "FR", "UK", "CN", "JP", "IN", "BR", "CA", "AU"]
+    currencies = ["EUR", "USD", "GBP", "EUR", "JPY", "CNY", "BRL", "INR", "AUD", "CAD"]
+    industries = ["technology", "healthcare", "finance", "energy", "consumer"]
     return [
-        Jurisdiction(
-            code=codes[i],
-            name=names[i],
-            regulatory_body=bodies[i],
-            tax_rate=0.15 + i * 0.02,
+        CrossBorderDeal(
+            acquirer_country=acquirers[i],
+            target_country=targets[i],
+            deal_value=100_000_000,
+            currency=currencies[i],
+            industry=industries[i % len(industries)],
         )
         for i in range(n)
     ]
@@ -455,18 +453,13 @@ class TestBenchmarkDueDiligence:
 # ---------------------------------------------------------------------------
 
 class TestBenchmarkCrossBorder:
-    """Benchmarks for cross-border deal optimization engine."""
+    """Benchmarks for cross-border deal analysis engine."""
 
     def test_benchmark_cross_border_10(self, benchmark):
-        """Benchmark cross-border optimization with 10 jurisdictions."""
-        optimizer = CrossBorderOptimizer()
-        jurisdictions = _make_jurisdictions(10)
-        deal = CrossBorderDeal(
-            jurisdictions=jurisdictions,
-            deal_value=100_000_000,
-            deal_type="acquisition",
-        )
-        result = benchmark(optimizer.optimize, deal)
+        """Benchmark cross-border analysis with 10 deals."""
+        analyzer = CrossBorderAnalyzer()
+        deals = _make_deals(10)
+        result = benchmark(analyzer.generate_cross_border_report, deals[0])
         assert result is not None
 
 

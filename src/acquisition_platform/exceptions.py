@@ -55,3 +55,13 @@ class InvalidRangeError(AcquisitionPlatformError, ValueError):
     """
 
     pass
+
+
+class NodeNotFoundError(AcquisitionPlatformError, KeyError):
+    """Raised when a referenced graph node does not exist.
+
+    This exception is raised when an operation references a node_id
+    that has not been added to the graph.
+    """
+
+    pass
