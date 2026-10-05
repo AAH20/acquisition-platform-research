@@ -1,0 +1,52 @@
+flowchart LR
+    subgraph Input["Technology Input"]
+        TECH[Technology Profile]
+        PATENT[Patent Portfolio]
+        TEAM[Team Data]
+        FIN[Financials]
+    end
+
+    subgraph Assessment["Assessment Layer"]
+        TRL[TRL Assessment]
+        EXPORT[Export Control]
+        IP[IP Valuation]
+        TALENT[Talent Assessment]
+        FINMODEL[Financial Modeling]
+        RISK[Risk Assessment]
+    end
+
+    subgraph Decision["Decision Layer"]
+        DEAL[Deal Structuring]
+        NATSEC[National Security]
+        SWF[SWF Matching]
+        PORTOPT[Portfolio Optimization]
+    end
+
+    subgraph Output["Output"]
+        SCORE[Composite Score]
+        RECOMMEND[Recommendation]
+        REPORT[Report]
+    end
+
+    TECH --> TRL
+    TECH --> EXPORT
+    PATENT --> IP
+    TEAM --> TALENT
+    FIN --> FINMODEL
+    TRL --> RISK
+    EXPORT --> RISK
+    IP --> DEAL
+    TALENT --> DEAL
+    FINMODEL --> DEAL
+    RISK --> DEAL
+    DEAL --> NATSEC
+    NATSEC --> SWF
+    SWF --> PORTOPT
+    PORTOPT --> SCORE
+    SCORE --> RECOMMEND
+    RECOMMEND --> REPORT
+
+    style Input fill:#6e7681,stroke:#30363d,color:#fff
+    style Assessment fill:#8b5cff,stroke:#30363d,color:#fff
+    style Decision fill:#1f6feb,stroke:#30363d,color:#fff
+    style Output fill:#238636,stroke:#30363d,color:#fff

@@ -1,111 +1,48 @@
 flowchart TD
     subgraph Input["Input"]
-        DATA[Research Data<br/>Entities + Financials]
-        BENCH[Benchmark Target<br/>evolution.py]
-        PARAMS[Parameters<br/>config.py]
+        DATA[Research Data]
+        BENCH[Benchmarks]
+        PARAMS[Parameters]
     end
 
-    subgraph Evolution["Evolution Engine<br/>evolution.py"]
-        INIT[Initialize Population<br/>Random Genes]
-        EVAL[Evaluate Fitness<br/>fitness_fn]
-        SELECT[Tournament Selection<br/>Pick Best of 2]
-        CROSS[Uniform Crossover<br/>Average Parents]
-        MUTATE[Gaussian Mutation<br/>+ Clamp to Range]
-        REPLACEMENT[Elitism + Replacement<br/>Keep Top N]
-        CONVERGE[Convergence Check<br/>Stagnation >= 5]
+    subgraph Evolution["Evolution Engine"]
+        INIT[Initialize Population]
+        EVAL[Evaluate Fitness]
+        SELECT[Selection]
+        CROSS[Crossover]
+        MUTATE[Mutation]
+        REPLACEMENT[Replacement]
     end
 
     subgraph Evaluation["Evaluation Framework"]
-        METRICS[Metrics Calculator<br/>best/worst/diversity]
-        COMPARISON[Benchmark Comparison<br/>Benchmark.evaluate]
-        RANKING[Result Ranking<br/>Score Descending]
-        VISUAL[Visualization<br/>reporting.py]
+        METRICS[Metrics Calculator]
+        COMPARISON[Comparison]
+        RANKING[Result Ranking]
+        VISUAL[Visualization]
     end
 
     subgraph Output["Output"]
-        BEST[Best Solution<br/>Hyperparameters]
-        REPORT[Report<br/>reporting.py]
-        DEPLOY[Deployment<br/>API/CLI]
+        BEST[Best Solution]
+        REPORT[Report]
+        DEPLOY[Deployment]
     end
 
-    subgraph System["System Integration"]
-        INIT_PKG[Package Init<br/>__init__.py]
-        ORCH[Orchestrator<br/>orchestrator.py]
-        API[REST API<br/>api.py]
-        CLI[CLI<br/>__main__.py]
-        NOTIF[Notifications<br/>notifications.py]
-        OBS[Observability<br/>observability.py]
-        CACHE[Caching<br/>caching.py]
-        BATCH[Batch Processing<br/>batch.py]
-        SEC[Security<br/>security.py]
-        SER[Serialization<br/>serialization.py]
-        EXC[Exceptions<br/>exceptions.py]
-        SCHEMAS[Schemas<br/>schemas.py]
-        IO[Data I/O<br/>data_io.py]
-        MATCH[Matching<br/>matching.py]
-        VAL[Valuation<br/>valuation.py]
-        FRAUD[Fraud Detection<br/>fraud_detection.py]
-        PORT[Portfolio Opt<br/>portfolio_optimizer.py]
-        PRICE[Pricing<br/>dynamic_pricing.py]
-        ER[Entity Resolution<br/>entity_resolution.py]
-        RANK[Ranking<br/>search_ranking.py]
-        AUC[Auction Design<br/>auction_design.py]
-        DD[Due Diligence<br/>due_diligence.py]
-        XB[Cross-Border<br/>cross_border.py]
-        REC[Recommendation<br/>recommendation.py]
-    end
+    Input --> Evolution
+    Evolution --> Evaluation
+    Evaluation --> Output
 
-    DATA --> ORCH
-    BENCH --> COMPARISON
-    PARAMS --> INIT
-
-    ORCH --> INIT
     INIT --> EVAL
     EVAL --> SELECT
     SELECT --> CROSS
     CROSS --> MUTATE
     MUTATE --> REPLACEMENT
-    REPLACEMENT --> CONVERGE
-    CONVERGE --> EVAL
+    REPLACEMENT --> EVAL
 
-    EVAL --> METRICS
     METRICS --> COMPARISON
     COMPARISON --> RANKING
     RANKING --> VISUAL
-
-    RANKING --> BEST
-    VISUAL --> REPORT
-    BEST --> DEPLOY
-
-    INIT_PKG --> ORCH
-    INIT_PKG --> API
-    INIT_PKG --> CLI
-    ORCH --> API
-    ORCH --> CLI
-    ORCH --> NOTIF
-    ORCH --> OBS
-    ORCH --> MATCH
-    ORCH --> VAL
-    ORCH --> FRAUD
-    ORCH --> PORT
-    ORCH --> PRICE
-    ORCH --> RANK
-    ORCH --> EVO
-    API --> AUC
-    API --> DD
-    API --> XB
-    API --> REC
-    API --> ER
-    ORCH --> CACHE
-    ORCH --> BATCH
-    ORCH --> SEC
-    ORCH --> SER
-    ORCH --> EXC
-    ORCH --> SCHEMAS
-    ORCH --> IO
 
     style Input fill:#6e7681,stroke:#30363d,color:#fff
     style Evolution fill:#238636,stroke:#30363d,color:#fff
     style Evaluation fill:#1f6feb,stroke:#30363d,color:#fff
     style Output fill:#f85149,stroke:#30363d,color:#fff
-    style System fill:#8b5cff,stroke:#30363d,color:#fff

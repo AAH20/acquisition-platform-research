@@ -1,96 +1,64 @@
 flowchart LR
-    subgraph Input["Input Layer"]
-        ENT[Entity Dict<br/>JSON]
-        FIN[Financial Data<br/>JSON]
-        SIG[Fraud Signals<br/>JSON]
-        BID[Bid Data<br/>JSON]
-        TASK[Task Data<br/>JSON]
-        JUR[Jurisdiction Data<br/>JSON]
-        USER[User Profile<br/>JSON]
-        LIST[Listing Data<br/>JSON]
+    subgraph Sources["Data Sources"]
+        S1[Crunchbase]
+        S2[PitchBook]
+        S3[Flippa]
+        S4[Acquire.com]
+        S5[Empire Flippers]
+        S6[Quiet Light]
+        S7[FE International]
     end
 
-    subgraph Processing["Processing Layer"]
-        ER[Entity Resolution<br/>entity_resolution.py]
-        VAL[Valuation<br/>valuation.py]
-        FRAUD[Fraud Detection<br/>fraud_detection.py]
-        MATCH[Matching<br/>matching.py]
-        PORT[Portfolio Opt<br/>portfolio_optimizer.py]
-        PRICE[Pricing<br/>dynamic_pricing.py]
-        RANK[Ranking<br/>search_ranking.py]
-        AUC[Auction Design<br/>auction_design.py]
-        DD[Due Diligence<br/>due_diligence.py]
-        XB[Cross-Border<br/>cross_border.py]
-        REC[Recommendation<br/>recommendation.py]
-        EVO[Evolution<br/>evolution.py]
+    subgraph Ingestion["Ingestion"]
+        I1[API Polling]
+        I2[Web Scraping]
+        I3[File Upload]
+        I4[Manual Entry]
     end
 
-    subgraph Infrastructure["Infrastructure"]
-        INIT[Package Init<br/>__init__.py]
-        ORCH[Orchestrator<br/>orchestrator.py]
-        CACHE[Caching<br/>caching.py]
-        BATCH[Batch Processing<br/>batch.py]
-        CFG[Config<br/>config.py]
-        SEC[Security<br/>security.py]
-        OBS[Observability<br/>observability.py]
-        NOTIF[Notifications<br/>notifications.py]
-        IO[Data I/O<br/>data_io.py]
-        SER[Serialization<br/>serialization.py]
-        EXC[Exceptions<br/>exceptions.py]
-        SCHEMAS[Schemas<br/>schemas.py]
+    subgraph Processing["Processing"]
+        P1[Normalization]
+        P2[Entity Resolution]
+        P3[Validation]
+        P4[Enrichment]
     end
 
-    subgraph Output["Output Layer"]
-        REPORT[Report<br/>reporting.py]
-        API_REST[REST API<br/>api.py]
-        CLI_OUT[CLI<br/>__main__.py]
+    subgraph Storage["Storage"]
+        D1[(Graph DB)]
+        D2[(Data Warehouse)]
+        D3[(Cache)]
+        D4[(VDR)]
     end
 
-    ENT --> ER
-    ENT --> MATCH
-    ENT --> FRAUD
-    ENT --> PORT
-    ENT --> RANK
-    FIN --> VAL
-    SIG --> FRAUD
-    BID --> AUC
-    TASK --> DD
-    JUR --> XB
-    USER --> REC
-    LIST --> RANK
+    subgraph Analytics["Analytics"]
+        A1[Valuation]
+        A2[Matching]
+        A3[Fraud Detection]
+        A4[Portfolio Opt]
+        A5[Pricing]
+        A6[TRL Assessment]
+        A7[Export Control]
+        A8[Risk Scoring]
+        A9[IP Valuation]
+        A10[Talent Assessment]
+    end
 
-    INIT --> ORCH
-    INIT --> API_REST
-    INIT --> CLI_OUT
-    ER --> ORCH
-    VAL --> ORCH
-    FRAUD --> ORCH
-    MATCH --> ORCH
-    PORT --> ORCH
-    PRICE --> ORCH
-    RANK --> ORCH
-    EVO --> ORCH
+    subgraph Output["Output"]
+        O1[Recommendations]
+        O2[Alerts]
+        O3[Reports]
+        O4[Deals]
+    end
 
-    ORCH --> REPORT
-    ORCH --> API_REST
-    ORCH --> CLI_OUT
+    Sources --> Ingestion
+    Ingestion --> Processing
+    Processing --> Storage
+    Storage --> Analytics
+    Analytics --> Output
 
-    REC --> CACHE
-    EVO --> CFG
-    MATCH --> BATCH
-    VAL --> BATCH
-    ER --> BATCH
-
-    API_REST --> SEC
-    API_REST --> OBS
-    ORCH --> OBS
-    ORCH --> NOTIF
-    ORCH --> IO
-    ORCH --> SER
-    ORCH --> EXC
-    ORCH --> SCHEMAS
-
-    style Input fill:#6e7681,stroke:#30363d,color:#fff
-    style Processing fill:#1f6feb,stroke:#30363d,color:#fff
-    style Infrastructure fill:#8b5cff,stroke:#30363d,color:#fff
+    style Sources fill:#6e7681,stroke:#30363d,color:#fff
+    style Ingestion fill:#1f6feb,stroke:#30363d,color:#fff
+    style Processing fill:#8b5cff,stroke:#30363d,color:#fff
+    style Storage fill:#d29922,stroke:#30363d,color:#fff
+    style Analytics fill:#238636,stroke:#30363d,color:#fff
     style Output fill:#f85149,stroke:#30363d,color:#fff

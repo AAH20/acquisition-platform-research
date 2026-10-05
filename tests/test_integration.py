@@ -1757,3 +1757,171 @@ class TestOrchestratorIntegration:
         pipeline_entities = _entities_for_full_pipeline()
         result = pipeline.run(pipeline_entities, _full_config())
         assert result is not None
+
+
+# ---------------------------------------------------------------------------
+# Integration module tests (Wave 2)
+# ---------------------------------------------------------------------------
+
+
+class TestIntegrationModule:
+    """Tests for the integration module (IntegrationManager, Integration, SyncResult)."""
+
+    def test_integration_creation(self):
+        """Integration created via manager."""
+        from acquisition_platform.integration import IntegrationManager
+
+        manager = IntegrationManager()
+        integration = manager.create_integration(
+            name="crm-sync",
+            source="salesforce",
+            target="data-warehouse",
+            config={"batch_size": 100},
+        )
+        assert integration.name == "crm-sync"
+        assert integration.source == "salesforce"
+        assert integration.target == "data-warehouse"
+        assert integration.config["batch_size"] == 100
+        assert integration.integration_id
+        assert integration.status == "active"
+
+    def test_data_sync(self):
+        """Data synchronized via manager."""
+        from acquisition_platform.integration import IntegrationManager
+
+        manager = IntegrationManager()
+        integration = manager.create_integration(
+            name="crm-sync",
+            source="salesforce",
+            target="data-warehouse",
+            config={},
+        )
+        result = manager.sync_data(integration)
+        assert result.integration is integration
+        assert result.records_synced > 0
+        assert result.errors >= 0
+        assert result.duration_seconds >= 0.0
+
+    def test_empty_integration(self):
+        """Empty integration returns defaults."""
+        from acquisition_platform.integration import Integration, IntegrationManager
+
+        manager = IntegrationManager()
+        integration = manager.create_integration(
+            name="empty",
+            source="",
+            target="",
+            config={},
+        )
+        assert integration.name == "empty"
+        assert integration.source == ""
+        assert integration.target == ""
+        assert integration.config == {}
+        assert integration.status == "active"
+        # Sync on empty integration yields zero records
+        result = manager.sync_data(integration)
+        assert result.records_synced == 0
+        assert result.errors == 0
+
+    def test_integration_validation(self):
+        """Integration validated via manager."""
+        from acquisition_platform.integration import IntegrationManager
+
+        manager = IntegrationManager()
+        integration = manager.create_integration(
+            name="valid-integration",
+            source="salesforce",
+            target="data-warehouse",
+            config={"batch_size": 50},
+        )
+        assert manager.validate_integration(integration) is True
+
+    def test_integration_report(self):
+        """Report generated from sync result."""
+        from acquisition_platform.integration import IntegrationManager
+
+        manager = IntegrationManager()
+        integration = manager.create_integration(
+            name="report-test",
+            source="salesforce",
+            target="data-warehouse",
+            config={},
+        )
+        result = manager.sync_data(integration)
+        report = manager.generate_integration_report(result)
+        assert report["integration_id"] == integration.integration_id
+        assert report["records_synced"] == result.records_synced
+        assert report["errors"] == result.errors
+        assert report["duration_seconds"] == result.duration_seconds
+        assert "status" in report
+
+    def test_integration_monitoring(self):
+        """Integration monitored via manager."""
+        from acquisition_platform.integration import IntegrationManager
+
+        manager = IntegrationManager()
+        integration = manager.create_integration(
+            name="monitor-test",
+            source="salesforce",
+            target="data-warehouse",
+            config={},
+        )
+        metrics = manager.monitor_integration(integration)
+        assert isinstance(metrics, dict)
+        assert "status" in metrics
+        assert "uptime_seconds" in metrics
+        assert "last_sync" in metrics
+
+    def test_integration_error_handling(self):
+        """Errors handled via manager."""
+        from acquisition_platform.integration import IntegrationManager
+
+        manager = IntegrationManager()
+        errors = ["connection timeout", "schema mismatch", "rate limit exceeded"]
+        handled = manager.handle_integration_errors(errors)
+        assert isinstance(handled, list)
+        assert len(handled) == len(errors)
+        assert all(isinstance(e, str) for e in handled)
+
+    def test_integration_optimization(self):
+        """Integration optimized via manager."""
+        from acquisition_platform.integration import IntegrationManager
+
+        manager = IntegrationManager()
+        integration = manager.create_integration(
+            name="optimize-test",
+            source="salesforce",
+            target="data-warehouse",
+            config={"batch_size": 10},
+        )
+        optimized = manager.optimize_integration(integration)
+        assert optimized.integration_id == integration.integration_id
+        assert optimized.config["batch_size"] > integration.config["batch_size"]
+
+    def test_integration_security(self):
+        """Security checked via manager."""
+        from acquisition_platform.integration import IntegrationManager
+
+        manager = IntegrationManager()
+        integration = manager.create_integration(
+            name="security-test",
+            source="salesforce",
+            target="data-warehouse",
+            config={"encryption": "aes-256"},
+        )
+        assert manager.check_integration_security(integration) is True
+
+    def test_integration_scaling(self):
+        """Scaling handled via manager."""
+        from acquisition_platform.integration import IntegrationManager
+
+        manager = IntegrationManager()
+        integration = manager.create_integration(
+            name="scale-test",
+            source="salesforce",
+            target="data-warehouse",
+            config={"workers": 2},
+        )
+        scaled = manager.scale_integration(integration, factor=4)
+        assert scaled.integration_id == integration.integration_id
+        assert scaled.config["workers"] == integration.config["workers"] * 4

@@ -1,161 +1,86 @@
 graph TD
-    subgraph Interface["Interface Layer"]
-        INIT[Package Init<br/>__init__.py]
-        CLI[CLI<br/>__main__.py]
-        API[REST API<br/>api.py]
-        ORCH[Orchestrator<br/>orchestrator.py]
-        REPORT[Reporting<br/>reporting.py]
+    subgraph DataLayer["Data Layer"]
+        ER[Entity Resolution]
+        VAL[Valuation Engine]
+        FRAUD[Fraud Detection]
+        NLP[NLP Analysis]
     end
 
     subgraph MatchingLayer["Matching Layer"]
-        MATCH[Buyer-Seller Matching<br/>matching.py]
-        RANK[Search Ranking<br/>search_ranking.py]
-        REC[Recommendation<br/>recommendation.py]
-    end
-
-    subgraph ValuationLayer["Valuation Layer"]
-        VAL[Valuation<br/>valuation.py]
-        PRICE[Dynamic Pricing<br/>dynamic_pricing.py]
-        AUC[Auction Design<br/>auction_design.py]
-    end
-
-    subgraph RiskLayer["Risk & Compliance"]
-        FRAUD[Fraud Detection<br/>fraud_detection.py]
-        DD[Due Diligence<br/>due_diligence.py]
-        XB[Cross-Border<br/>cross_border.py]
-        SEC[Security<br/>security.py]
+        MATCH[Buyer-Seller Matching]
+        RANK[Search Ranking]
+        REC[Recommendation System]
     end
 
     subgraph OptimizationLayer["Optimization Layer"]
-        PORT[Portfolio Optimizer<br/>portfolio_optimizer.py]
-        EVO[Evolution<br/>evolution.py]
+        PORT[Portfolio Optimization]
+        PRICE[Dynamic Pricing]
+        AUC[Auction Design]
+        DD[Due Diligence]
+        XB[Cross-Border M&A]
     end
 
-    subgraph DataLayer["Data Layer"]
-        ER[Entity Resolution<br/>entity_resolution.py]
-        IO[Data I/O<br/>data_io.py]
-        BATCH[Batch Processing<br/>batch.py]
-        CACHE[Caching<br/>caching.py]
+    subgraph DualUseLayer["Dual-Use Assessment"]
+        TRL[TRL Assessment]
+        EXPORT[Export Control]
+        IP[IP Valuation]
+        TALENT[Talent]
+        RISK[Risk Assessment]
+        DEAL[Deal Structuring]
+        PMI[Post-Merger]
+        NATSEC[National Security]
+        SWF[SWF Matching]
+        DUALCLASS[Dual-Use Classifier]
+        MKT[Market Analysis]
+        CI[Competitive Intel]
+        TECHTRANSFER[Tech Transfer]
+        PORTOPT[Portfolio Opt]
+        DUE_DIL[Due Diligence]
+        GRAPH[Graph Analysis]
     end
 
-    subgraph SupportLayer["Support Layer"]
-        CFG[Config<br/>config.py]
-        OBS[Observability<br/>observability.py]
-        NOTIF[Notifications<br/>notifications.py]
-        SER[Serialization<br/>serialization.py]
-        EXC[Exceptions<br/>exceptions.py]
-        SCHEMAS[Schemas<br/>schemas.py]
+    subgraph EvolutionLayer["Evolution Layer"]
+        BENCH[Benchmarks]
+        EVO[Evolution Engine]
+        EVAL[Evaluation]
     end
-
-    INIT --> CLI
-    INIT --> API
-    CLI --> ORCH
-    API --> ORCH
-    ORCH --> MATCH
-    ORCH --> VAL
-    ORCH --> FRAUD
-    ORCH --> PORT
-    ORCH --> PRICE
-    ORCH --> RANK
-    ORCH --> EVO
-    API --> AUC
-    API --> DD
-    API --> XB
-    API --> REC
-    API --> ER
-    ORCH --> REPORT
 
     ER --> MATCH
     ER --> RANK
-    ER --> REC
     VAL --> MATCH
     VAL --> PORT
     VAL --> PRICE
     FRAUD --> MATCH
     FRAUD --> REC
-    FRAUD --> DD
+    NLP --> RANK
+    NLP --> CI
     MATCH --> PORT
     MATCH --> AUC
     RANK --> REC
+    TRL --> DUALCLASS
+    EXPORT --> DUALCLASS
+    IP --> PORTOPT
+    TALENT --> PMI
+    RISK --> DEAL
+    DEAL --> PMI
+    NATSEC --> DEAL
+    SWF --> PORTOPT
+    DUALCLASS --> MKT
+    CI --> MKT
+    TECHTRANSFER --> TRL
+    PORTOPT --> EVO
+    DUE_DIL --> EVO
+    GRAPH --> CI
     PORT --> EVO
     PRICE --> EVO
     AUC --> EVO
     DD --> EVO
     XB --> EVO
-    SEC --> MATCH
-    SEC --> VAL
-    SEC --> FRAUD
-    CFG --> MATCH
-    CFG --> VAL
-    CFG --> FRAUD
-    CFG --> PORT
-    CFG --> PRICE
-    CFG --> ER
-    CFG --> RANK
-    CFG --> EVO
-    OBS --> MATCH
-    OBS --> VAL
-    OBS --> FRAUD
-    OBS --> PORT
-    OBS --> PRICE
-    OBS --> ER
-    OBS --> RANK
-    OBS --> AUC
-    OBS --> DD
-    OBS --> XB
-    OBS --> REC
-    OBS --> EVO
-    NOTIF --> FRAUD
-    NOTIF --> MATCH
-    NOTIF --> PORT
-    NOTIF --> EVO
-    CACHE --> REC
-    BATCH --> MATCH
-    BATCH --> VAL
-    BATCH --> ER
-    IO --> ER
-    IO --> VAL
-    SER --> MATCH
-    SER --> VAL
-    SER --> FRAUD
-    SER --> PORT
-    SER --> PRICE
-    SER --> ER
-    SER --> RANK
-    SER --> AUC
-    SER --> DD
-    SER --> XB
-    SER --> REC
-    SER --> EVO
-    EXC --> MATCH
-    EXC --> VAL
-    EXC --> FRAUD
-    EXC --> PORT
-    EXC --> PRICE
-    EXC --> ER
-    EXC --> RANK
-    EXC --> AUC
-    EXC --> DD
-    EXC --> XB
-    EXC --> REC
-    EXC --> EVO
-    SCHEMAS --> MATCH
-    SCHEMAS --> VAL
-    SCHEMAS --> FRAUD
-    SCHEMAS --> PORT
-    SCHEMAS --> PRICE
-    SCHEMAS --> ER
-    SCHEMAS --> RANK
-    SCHEMAS --> AUC
-    SCHEMAS --> DD
-    SCHEMAS --> XB
-    SCHEMAS --> REC
-    SCHEMAS --> EVO
+    EVO --> BENCH
+    EVAL --> EVO
 
-    style Interface fill:#f85149,stroke:#30363d,color:#fff
+    style DataLayer fill:#d29922,stroke:#30363d,color:#fff
     style MatchingLayer fill:#1f6feb,stroke:#30363d,color:#fff
-    style ValuationLayer fill:#d29922,stroke:#30363d,color:#fff
-    style RiskLayer fill:#f85149,stroke:#30363d,color:#fff
     style OptimizationLayer fill:#8b5cff,stroke:#30363d,color:#fff
-    style DataLayer fill:#238636,stroke:#30363d,color:#fff
-    style SupportLayer fill:#6e7681,stroke:#30363d,color:#fff
+    style DualUseLayer fill:#238636,stroke:#30363d,color:#fff
+    style EvolutionLayer fill:#f85149,stroke:#30363d,color:#fff
