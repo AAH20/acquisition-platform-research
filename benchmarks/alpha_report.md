@@ -1,6 +1,6 @@
 # Alpha Report — Evolved Matching Policy
 
-Seed **7**, population **2381 evaluations** across **40 generations** in 10.19s.
+Seed **7**, population **2381 evaluations** across **40 generations** in 9.68s.
 
 ## Hold-out performance
 
@@ -85,6 +85,24 @@ Training NDCG reaches 0.7196 (gap 0.0410). With roughly a third of the utility u
 
 ±5% uniform price perturbation over 5 trials: mean Spearman **0.9708**, worst trial **0.9624**, mean NDCG drop **0.0032**.
 
+## Walk-forward under drift
+
+Latent midpoint drifts 0.425 → 0.575 across four cohorts. Frozen is
+fitted once; adaptive is refitted on the previous cohort.
+
+| Step | Train midpoint | Test midpoint | Frozen | Adaptive | Ensemble |
+|-----:|---------------:|--------------:|-------:|---------:|---------:|
+| 1 | 0.425 | 0.475 | 0.9831 | 0.9765 | 0.9709 |
+| 2 | 0.475 | 0.525 | 0.8961 | 0.9565 | 0.9563 |
+| 3 | 0.525 | 0.575 | 0.8094 | 0.9471 | 0.9409 |
+
+Frozen mean **0.8962**, adaptive mean **0.9600** (+0.0638), ensemble mean **0.9560** (-0.0040 vs single).
+
+Refitting recovers part of the drift loss. Ensembling the Pareto
+front does **not** add lift here — front members are highly
+correlated and slightly overfit — so the single alpha remains the
+default.
+
 ## Promotion gate
 
 Alpha `matching-policy-s7` is at stage **canary**; promotion accepted: **False** (alpha already registered (idempotent run)); hash chain verified: **True**.
@@ -99,8 +117,8 @@ Alpha `matching-policy-s7` is at stage **canary**; promotion accepted: **False**
 
 | Case | Median ms | Target ms | Pass |
 |------|----------:|----------:|:----:|
-| matching_50x50 | 2.64 | 250.00 | yes |
+| matching_50x50 | 4.64 | 250.00 | yes |
 | ndcg_1000 | 0.06 | 10.00 | yes |
-| evolution_20x10 | 38.61 | 1500.00 | yes |
+| evolution_20x10 | 43.38 | 1500.00 | yes |
 
 Suite score: **3/3** cases inside target.

@@ -236,6 +236,27 @@ Ranking under ±5% uniform price perturbation, five trials:
 The policy is stable to small pricing errors, which matters because quoted
 prices are noisy in practice.
 
+### Walk-forward under drift
+
+Four cohorts drift from a 0.425 to a 0.575 fair-value midpoint. The frozen
+policy is fitted once on cohort 0; the adaptive policy is refitted on the
+previous cohort; the ensemble mean-ranks the adaptive run's Pareto front.
+
+| Step | Train midpoint | Test midpoint | Frozen | Adaptive | Ensemble |
+|-----:|---------------:|--------------:|-------:|---------:|---------:|
+| 1 | 0.425 | 0.475 | 0.9831 | 0.9765 | 0.9709 |
+| 2 | 0.475 | 0.525 | 0.8961 | 0.9565 | 0.9563 |
+| 3 | 0.525 | 0.575 | 0.8094 | 0.9471 | 0.9409 |
+
+Frozen mean **0.8962**, adaptive mean **0.9600** (+0.0638). The gap widens with
+every transition — +0.1377 by the third — so decay compounds rather than
+settling.
+
+Ensembling does **not** help (−0.0040): the front members are highly correlated
+and slightly overfit, so mean-rank aggregation adds noise instead of
+diversification. The ensemble is kept as a comparator; the single alpha remains
+the deployment default, and the actionable control is **refit cadence**.
+
 ---
 
 ## 6. Interpretation and limits
@@ -270,6 +291,14 @@ shifts are the material risk: at a true midpoint of 0.65 the policy retains
 0.7203 NDCG, still far above the legacy 0.3128 but well below its ceiling.
 Deployment as a prior should therefore be paired with periodic re-estimation of
 the midpoint, not treated as a fixed policy.
+
+**Drift is a cadence problem, not a modelling problem.** A frozen policy loses
+0.174 NDCG across three drifted periods (0.9831 → 0.8094), while per-period
+refitting holds ≥0.947. The loss compounds, so the registry should carry a
+maximum age for a production alpha and promotion should require a walk-forward
+result, not a single-split one. Ensembling does not substitute for refitting:
+it scored 0.004 below the single alpha because the front members were
+correlated and slightly overfit.
 
 ---
 
@@ -362,6 +391,7 @@ python -m pytest tests/test_evaluation.py tests/test_alpha_evolution.py \
                  tests/test_matching_policy.py tests/test_alpha_lab.py \
                  tests/test_alpha_robustness.py tests/test_alpha_registry.py \
                  tests/test_alpha_misspecification.py \
+                 tests/test_alpha_walk_forward.py \
                  tests/test_benchmark_suite.py -v
 python benchmarks/evolve_alphas.py --buyers 120
 ```

@@ -67,6 +67,9 @@ from acquisition_platform.alpha_lab import (
     RobustnessPoint,
     SearchComparison,
     StabilityReport,
+    TemporalBenchmark,
+    WalkForwardReport,
+    WalkForwardStep,
 )
 from acquisition_platform.alpha_registry import (
     AlphaRegistry,
@@ -129,6 +132,9 @@ __all__ = [
     "Seller",
     "StabilityReport",
     "SuiteReport",
+    "TemporalBenchmark",
+    "WalkForwardReport",
+    "WalkForwardStep",
     "ValuationEngine",
     "ValuationResult",
     "average_precision",

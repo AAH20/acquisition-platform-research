@@ -1264,7 +1264,7 @@
       0.02234352203811969
     ],
     "seed": 7,
-    "elapsed_seconds": 10.19315735399141
+    "elapsed_seconds": 9.676350079011172
   },
   "selected_alpha": {
     "alpha_id": "a000-0056",
@@ -1332,7 +1332,7 @@
     "train_cases": 72,
     "test_cases": 48,
     "benchmark_fingerprint": "e7423ecd20acbb85",
-    "wall_seconds": 10.235
+    "wall_seconds": 9.715
   },
   "cross_validation": {
     "n_splits": 5,
@@ -1442,7 +1442,7 @@
     "random_best": -25.335196198476652,
     "evolutionary_evals": 497,
     "random_evals": 2381,
-    "wall_seconds": 0.20803891000105068
+    "wall_seconds": 0.2151209469884634
   },
   "misspecification": {
     "quality_weight": 0.6,
@@ -1471,6 +1471,39 @@
     "min_spearman": 0.9624125874125874,
     "mean_ndcg_drop": 0.0032385367682903387
   },
+  "walk_forward": {
+    "steps": [
+      {
+        "step": 1,
+        "train_midpoint": 0.425,
+        "test_midpoint": 0.475,
+        "frozen_ndcg": 0.9831408224037878,
+        "adaptive_ndcg": 0.976493198529564,
+        "ensemble_ndcg": 0.9709427539739988
+      },
+      {
+        "step": 2,
+        "train_midpoint": 0.475,
+        "test_midpoint": 0.525,
+        "frozen_ndcg": 0.8961060079645199,
+        "adaptive_ndcg": 0.9564583869045659,
+        "ensemble_ndcg": 0.9562531277455406
+      },
+      {
+        "step": 3,
+        "train_midpoint": 0.525,
+        "test_midpoint": 0.575,
+        "frozen_ndcg": 0.809417780572636,
+        "adaptive_ndcg": 0.9471387657761682,
+        "ensemble_ndcg": 0.940918643138157
+      }
+    ],
+    "frozen_mean": 0.8962215369803146,
+    "adaptive_mean": 0.9600301170700994,
+    "ensemble_mean": 0.9560381749525654,
+    "adaptive_advantage": 0.06380858008978485,
+    "ensemble_advantage": -0.003991942117534064
+  },
   "registry": {
     "alpha_id": "matching-policy-s7",
     "decision": {
@@ -1491,26 +1524,26 @@
     "results": [
       {
         "name": "matching_50x50",
-        "value": 2.6356489979662,
+        "value": 4.643416992621496,
         "target": 250.0,
         "passed": true,
-        "duration_ms": 2.6356489979662,
+        "duration_ms": 4.643416992621496,
         "unit": "ms"
       },
       {
         "name": "ndcg_1000",
-        "value": 0.06145599763840437,
+        "value": 0.06199601921252906,
         "target": 10.0,
         "passed": true,
-        "duration_ms": 0.06145599763840437,
+        "duration_ms": 0.06199601921252906,
         "unit": "ms"
       },
       {
         "name": "evolution_20x10",
-        "value": 38.60517599969171,
+        "value": 43.38027001358569,
         "target": 1500.0,
         "passed": true,
-        "duration_ms": 38.60517599969171,
+        "duration_ms": 43.38027001358569,
         "unit": "ms"
       }
     ]

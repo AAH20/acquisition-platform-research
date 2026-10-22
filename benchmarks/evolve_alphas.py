@@ -259,6 +259,38 @@ def write_markdown(path: Path, payload: dict[str, Any], suite: SuiteReport) -> N
             "",
         ]
 
+    walk = payload.get("walk_forward")
+    if walk:
+        lines += [
+            "## Walk-forward under drift",
+            "",
+            "Latent midpoint drifts 0.425 → 0.575 across four cohorts. Frozen is",
+            "fitted once; adaptive is refitted on the previous cohort.",
+            "",
+            "| Step | Train midpoint | Test midpoint | Frozen | Adaptive | Ensemble |",
+            "|-----:|---------------:|--------------:|-------:|---------:|---------:|",
+        ]
+        for step in walk["steps"]:
+            lines.append(
+                f"| {step['step']} | {step['train_midpoint']:.3f} | "
+                f"{step['test_midpoint']:.3f} | {step['frozen_ndcg']:.4f} | "
+                f"{step['adaptive_ndcg']:.4f} | {step['ensemble_ndcg']:.4f} |"
+            )
+        lines += [
+            "",
+            f"Frozen mean **{walk['frozen_mean']:.4f}**, adaptive mean "
+            f"**{walk['adaptive_mean']:.4f}** "
+            f"({walk['adaptive_advantage']:+.4f}), ensemble mean "
+            f"**{walk['ensemble_mean']:.4f}** "
+            f"({walk['ensemble_advantage']:+.4f} vs single).",
+            "",
+            "Refitting recovers part of the drift loss. Ensembling the Pareto",
+            "front does **not** add lift here — front members are highly",
+            "correlated and slightly overfit — so the single alpha remains the",
+            "default.",
+            "",
+        ]
+
     registry = payload.get("registry")
     if registry:
         decision = registry["decision"]
@@ -371,6 +403,17 @@ def main() -> int:
         result.selected_alpha.params, sigma=0.05, trials=5, seed=args.seed
     )
     payload["stability"] = stability.to_dict()
+
+    # temporal drift and walk-forward refitting
+    walk_lab = AlphaLab(seed=args.seed, population_size=40, generations=25)
+    temporal = walk_lab.build_temporal_benchmark(
+        n_cohorts=4,
+        buyers_per_cohort=max(40, args.buyers // 2),
+        drift=0.15,
+        seed=args.seed,
+    )
+    walk = walk_lab.walk_forward(temporal)
+    payload["walk_forward"] = walk.to_dict()
 
     # register the evaluated alpha and attempt one promotion
     card = EvaluationCard.create(

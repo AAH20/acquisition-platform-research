@@ -249,6 +249,68 @@ class StabilityReport:
         }
 
 
+@dataclass(frozen=True)
+class TemporalBenchmark:
+    """A sequence of cohorts whose latent fair-value point drifts over time."""
+
+    cohorts: tuple[MatchingBenchmark, ...]
+    midpoints: tuple[float, ...]
+    seed: int
+
+    def fingerprint(self) -> str:
+        """Stable digest of the whole sequence."""
+        digest = hashlib.sha256()
+        for cohort in self.cohorts:
+            digest.update(cohort.fingerprint().encode())
+        return digest.hexdigest()
+
+
+@dataclass(frozen=True)
+class WalkForwardStep:
+    """One out-of-time evaluation after refitting on the previous cohort."""
+
+    step: int
+    train_midpoint: float
+    test_midpoint: float
+    frozen_ndcg: float
+    adaptive_ndcg: float
+    ensemble_ndcg: float
+
+    def to_dict(self) -> dict[str, float | int]:
+        """Return a JSON-serialisable representation."""
+        return {
+            "step": self.step,
+            "train_midpoint": self.train_midpoint,
+            "test_midpoint": self.test_midpoint,
+            "frozen_ndcg": self.frozen_ndcg,
+            "adaptive_ndcg": self.adaptive_ndcg,
+            "ensemble_ndcg": self.ensemble_ndcg,
+        }
+
+
+@dataclass(frozen=True)
+class WalkForwardReport:
+    """Aggregated walk-forward result across all transitions."""
+
+    steps: tuple[WalkForwardStep, ...]
+    frozen_mean: float
+    adaptive_mean: float
+    ensemble_mean: float
+    adaptive_advantage: float
+    ensemble_advantage: float
+
+    def to_dict(self) -> dict[str, object]:
+        """Return a JSON-serialisable representation."""
+        return {
+            "steps": [step.to_dict() for step in self.steps],
+            "frozen_mean": self.frozen_mean,
+            "adaptive_mean": self.adaptive_mean,
+            "ensemble_mean": self.ensemble_mean,
+            "adaptive_advantage": self.adaptive_advantage,
+            "ensemble_advantage": self.ensemble_advantage,
+        }
+
+
 def _normalise_weights(weights: dict[str, float]) -> dict[str, float]:
     clipped = {name: max(0.0, weights.get(name, 0.0)) for name in WEIGHT_NAMES}
     total = sum(clipped.values())
@@ -305,6 +367,34 @@ def _metrics(policy: MatchingPolicy, split: MatchingSplit) -> dict[str, float]:
         "spearman": sum(correlations) / count,
         "avg_price_ratio": sum(price_ratios) / count,
     }
+
+
+def _ensemble_ndcg(
+    policies: Sequence[MatchingPolicy], split: MatchingSplit
+) -> float:
+    """Rank-aggregate several policies by mean rank and score the result.
+
+    Mean rank is used rather than score averaging because policies can return
+    scores on different scales after evolution; ranks are comparable.
+    """
+    total = 0.0
+    for case in split.cases:
+        ranks: list[list[float]] = []
+        for policy in policies:
+            scores = [policy.score(case.buyer, seller) for seller in case.sellers]
+            order = sorted(
+                range(len(scores)), key=lambda index: scores[index], reverse=True
+            )
+            rank = [0.0] * len(scores)
+            for position, index in enumerate(order):
+                rank[index] = float(position)
+            ranks.append(rank)
+        mean_rank = [
+            sum(rank[i] for rank in ranks) / len(ranks) for i in range(len(ranks[0]))
+        ]
+        order = sorted(range(len(mean_rank)), key=lambda index: mean_rank[index])
+        total += ndcg_at_k([case.relevance[index] for index in order], 5)
+    return total / len(split.cases)
 
 
 class AlphaLab:
@@ -922,6 +1012,130 @@ class AlphaLab:
             mean_spearman=statistics.fmean(trial_taus),
             min_spearman=min(trial_taus),
             mean_ndcg_drop=statistics.fmean(trial_drops),
+        )
+
+
+    def build_temporal_benchmark(
+        self,
+        n_cohorts: int = 4,
+        buyers_per_cohort: int = 60,
+        drift: float = 0.10,
+        seed: int | None = None,
+    ) -> TemporalBenchmark:
+        """Build cohorts whose latent fair-value point drifts upward.
+
+        Cohort ``c`` is centred at ``0.5 - drift/2 + drift*c/(n-1)``, so the
+        first cohort sits below the policy family's centre and the last sits
+        above it. Prices and buyers are regenerated per cohort, as a new market
+        period would be.
+
+        Args:
+            n_cohorts: Number of time periods, at least 3.
+            buyers_per_cohort: Buyers generated per period.
+            drift: Total upward drift in the fair-value point, in [0, 0.5).
+            seed: Base seed; defaults to the lab seed.
+
+        Returns:
+            TemporalBenchmark with one MatchingBenchmark per cohort.
+        """
+        if n_cohorts < 3:
+            raise InvalidRangeError("n_cohorts must be at least 3")
+        if not 0.0 <= drift < 0.5:
+            raise InvalidRangeError(f"drift must be in [0, 0.5), got {drift}")
+
+        base = self.seed if seed is None else seed
+        midpoints = tuple(
+            0.5 - drift / 2.0 + drift * index / (n_cohorts - 1)
+            for index in range(n_cohorts)
+        )
+        cohorts = tuple(
+            self.build_benchmark(
+                n_buyers=buyers_per_cohort,
+                seed=base + index,
+                midpoint_ratio=midpoint,
+            )
+            for index, midpoint in enumerate(midpoints)
+        )
+        return TemporalBenchmark(cohorts=cohorts, midpoints=midpoints, seed=base)
+
+    def walk_forward(
+        self, temporal: TemporalBenchmark, ensemble_size: int = 5
+    ) -> WalkForwardReport:
+        """Refit each period on the previous cohort and test out of time.
+
+        Three policies are compared on every transition:
+
+        - **frozen**: fitted once on the first cohort and never updated.
+        - **adaptive**: refitted on the most recent cohort only (rolling window).
+        - **ensemble**: mean-rank aggregation of the adaptive run's Pareto front,
+          restricted to members near the best training score.
+
+        The ensemble is a comparator rather than the default: on the current
+        benchmarks the front members are highly correlated and slightly
+        overfit, so aggregation does not beat the single selected alpha. That
+        negative result is reported rather than tuned away.
+
+        Args:
+            temporal: Cohort sequence from :meth:`build_temporal_benchmark`.
+            ensemble_size: Pareto members aggregated into the ensemble.
+
+        Returns:
+            WalkForwardReport with per-step and aggregate NDCG@5.
+        """
+        if ensemble_size < 1:
+            raise InvalidRangeError("ensemble_size must be at least 1")
+        if len(temporal.cohorts) < 2:
+            raise InvalidRangeError("walk_forward requires at least two cohorts")
+
+        first = temporal.cohorts[0]
+        frozen_run = self.evolve_matching_policy(first, seed=self.seed)
+        frozen_policy = MatchingPolicy.from_params(frozen_run.selected_alpha.params)
+
+        steps: list[WalkForwardStep] = []
+        for step in range(1, len(temporal.cohorts)):
+            cohort = temporal.cohorts[step]
+            previous = temporal.cohorts[step - 1]
+            frozen_ndcg = _metrics(frozen_policy, cohort.test)["ndcg@5"]
+
+            window = MatchingBenchmark(
+                train=previous.train,
+                test=cohort.test,
+                true_weights=cohort.true_weights,
+                seed=temporal.seed + step,
+            )
+            outcome = self.evolve_matching_policy(window, seed=self.seed + step)
+            adaptive_policy = MatchingPolicy.from_params(outcome.selected_alpha.params)
+
+            pool = sorted(
+                [adaptive_policy]
+                + [
+                    MatchingPolicy.from_params(alpha.params)
+                    for alpha in outcome.report.pareto_front
+                ],
+                key=lambda policy: _metrics(policy, window.train)["ndcg@5"],
+                reverse=True,
+            )[:ensemble_size]
+            steps.append(
+                WalkForwardStep(
+                    step=step,
+                    train_midpoint=temporal.midpoints[step - 1],
+                    test_midpoint=temporal.midpoints[step],
+                    frozen_ndcg=frozen_ndcg,
+                    adaptive_ndcg=outcome.evolved_metrics["ndcg@5"],
+                    ensemble_ndcg=_ensemble_ndcg(pool, cohort.test),
+                )
+            )
+
+        frozen_mean = statistics.fmean(step.frozen_ndcg for step in steps)
+        adaptive_mean = statistics.fmean(step.adaptive_ndcg for step in steps)
+        ensemble_mean = statistics.fmean(step.ensemble_ndcg for step in steps)
+        return WalkForwardReport(
+            steps=tuple(steps),
+            frozen_mean=frozen_mean,
+            adaptive_mean=adaptive_mean,
+            ensemble_mean=ensemble_mean,
+            adaptive_advantage=adaptive_mean - frozen_mean,
+            ensemble_advantage=ensemble_mean - adaptive_mean,
         )
 
 

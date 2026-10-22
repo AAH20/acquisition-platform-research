@@ -1,6 +1,6 @@
 # Acquisition Platform Research & Optimization
 
-> **Unified optimization engine for acquisition/auction platforms.** 100-agent parallel research across 8 platforms + 30+ dual-use verticals, 30 NP-hard problem solvers, an NSGA-II alpha-evolution engine, 1358 tests, 54 source modules, 7 architecture diagrams.
+> **Unified optimization engine for acquisition/auction platforms.** 100-agent parallel research across 8 platforms + 30+ dual-use verticals, 30 NP-hard problem solvers, an NSGA-II alpha-evolution engine, 1369 tests, 54 source modules, 7 architecture diagrams.
 
 ## Table of Contents
 
@@ -36,8 +36,8 @@ This project is a unified research and optimization engine for acquisition and a
 | Dual-use verticals researched | 30+ |
 | NP-hard problems solved | 30 |
 | Source modules | 54 |
-| Test files | 61 |
-| Tests passing | 1358 |
+| Test files | 62 |
+| Tests passing | 1369 |
 | Architecture diagrams | 7 |
 | Lines of code | ~17,000+ |
 | Research documents | 50+ |
@@ -79,6 +79,12 @@ does not.
 **Stability.** Under ±5% price noise the ranking holds: mean Spearman **0.9708**,
 worst trial 0.9624, mean NDCG drop 0.0032.
 
+**Drift.** Across four cohorts whose fair-value midpoint moves 0.425 → 0.575, a
+frozen policy decays 0.9831 → 0.8094 while per-period refitting holds 0.9765 →
+0.9471 (mean **+0.0638**, widening to **+0.1377** by the third period). Mean-rank
+ensembling of the Pareto front adds no lift (−0.0040), so the control that
+matters is refit cadence, not aggregation.
+
 **Where the gains survive — and where they do not.** Re-running the whole
 procedure on five disjoint folds reproduces the effect (+0.2358 ± 0.0254, win
 rate 100%). Under specification shift the evolved policy beats the legacy
@@ -93,6 +99,8 @@ random search spends 2,381 and stalls at −25.34. Both results are reported in
 shadow → canary → production stages and promotion gates. The measured alpha
 passes every gate and is promoted to canary with the chain verified; a tamper
 test rewrites a stored metric and confirms `verify()` returns `False`.
+Walk-forward results are the evidence a promotion should require, and the
+drift curve is why a production alpha needs a maximum age.
 
 ```python
 from acquisition_platform import AlphaLab, AlphaEvolver, EvolutionConfig, Objective, ParamSpec
@@ -787,7 +795,9 @@ Builds a deterministic labelled matching benchmark, evolves `MatchingPolicy`
 weights against the training split, and reports held-out metrics, recovered
 weights, generalisation gap, CI, and p-value. Also provides k-fold
 cross-validation, a specification-shift curve, an equal-budget random-search
-comparator, and an optimizer benchmark on multimodal objectives.
+comparator, a multimodal optimizer benchmark, a misspecification study,
+input-noise stability, and drift-aware walk-forward refitting with a
+Pareto-ensemble comparator.
 
 #### `alpha_registry.py` — Lifecycle & Audit
 
