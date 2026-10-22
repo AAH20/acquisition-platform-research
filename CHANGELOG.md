@@ -21,8 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Misspecification study (`AlphaLab.misspecification_study`): unobservable seller-quality signal, NDCG ceiling and top-1 regret
 - Input-noise stability (`AlphaLab.stability_under_noise`): Spearman and NDCG drop under price perturbation
 - Walk-forward (`AlphaLab.build_temporal_benchmark`, `AlphaLab.walk_forward`): drifting cohorts, frozen vs rolling refit, mean-rank ensemble comparator
+- Statistical validity: `holm_bonferroni` multiple-comparison control, `minimum_detectable_effect` power analysis, `hypervolume_2d` for two-objective fronts; shift points now carry paired bootstrap p-values
 - Benchmark regression gate gains a measurement-noise floor for sub-5 ms cases
-- 155 new tests since the v0.1 baseline (1369 total); mutation-tested invariants
+- 175 new tests since the v0.1 baseline (1389 total); mutation-tested invariants
 
 ### Changed
 - `BuyerSellerMatcher` accepts an optional `MatchingPolicy`

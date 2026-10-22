@@ -1,6 +1,6 @@
 # Acquisition Platform Research & Optimization
 
-> **Unified optimization engine for acquisition/auction platforms.** 100-agent parallel research across 8 platforms + 30+ dual-use verticals, 30 NP-hard problem solvers, an NSGA-II alpha-evolution engine, 1369 tests, 54 source modules, 7 architecture diagrams.
+> **Unified optimization engine for acquisition/auction platforms.** 100-agent parallel research across 8 platforms + 30+ dual-use verticals, 30 NP-hard problem solvers, an NSGA-II alpha-evolution engine, 1389 tests, 54 source modules, 7 architecture diagrams.
 
 ## Table of Contents
 
@@ -36,8 +36,8 @@ This project is a unified research and optimization engine for acquisition and a
 | Dual-use verticals researched | 30+ |
 | NP-hard problems solved | 30 |
 | Source modules | 54 |
-| Test files | 62 |
-| Tests passing | 1369 |
+| Test files | 63 |
+| Tests passing | 1389 |
 | Architecture diagrams | 7 |
 | Lines of code | ~17,000+ |
 | Research documents | 50+ |
@@ -84,6 +84,13 @@ frozen policy decays 0.9831 → 0.8094 while per-period refitting holds 0.9765 �
 0.9471 (mean **+0.0638**, widening to **+0.1377** by the third period). Mean-rank
 ensembling of the Pareto front adds no lift (−0.0040), so the control that
 matters is refit cadence, not aggregation.
+
+**Statistical validity.** Six specification-shift comparisons are corrected with
+Holm–Bonferroni at α = 0.05: five survive (p < 0.0001) and the 0.40 point does
+not (p = 0.152, delta −0.0163). The minimum detectable effect at 5 folds is
+**0.0318 NDCG**, so the +0.2358 cross-validation gain is **7.4×** the smallest
+effect this design can resolve — and the 0.40 delta sits below it, which makes
+it a null rather than a loss.
 
 **Where the gains survive — and where they do not.** Re-running the whole
 procedure on five disjoint folds reproduces the effect (+0.2358 ± 0.0254, win

@@ -142,14 +142,16 @@ class RobustnessPoint:
     baseline_ndcg: float
     evolved_ndcg: float
     delta: float
+    p_value: float | None = None
 
-    def to_dict(self) -> dict[str, float]:
+    def to_dict(self) -> dict[str, float | None]:
         """Return a JSON-serialisable representation."""
         return {
             "offset": self.offset,
             "baseline_ndcg": self.baseline_ndcg,
             "evolved_ndcg": self.evolved_ndcg,
             "delta": self.delta,
+            "p_value": self.p_value,
         }
 
 
@@ -367,6 +369,22 @@ def _metrics(policy: MatchingPolicy, split: MatchingSplit) -> dict[str, float]:
         "spearman": sum(correlations) / count,
         "avg_price_ratio": sum(price_ratios) / count,
     }
+
+
+def _case_ndcg(policy: MatchingPolicy, split: MatchingSplit) -> list[float]:
+    """Per-case NDCG@5, used for paired significance testing."""
+    scores: list[float] = []
+    for case in split.cases:
+        ranked = sorted(
+            zip(
+                case.relevance,
+                [policy.score(case.buyer, seller) for seller in case.sellers],
+            ),
+            key=lambda pair: pair[1],
+            reverse=True,
+        )
+        scores.append(ndcg_at_k([relevance for relevance, _ in ranked], 5))
+    return scores
 
 
 def _ensemble_ndcg(
@@ -687,12 +705,18 @@ class AlphaLab:
             )
             evolved_ndcg = _metrics(policy, shifted.test)["ndcg@5"]
             baseline_ndcg = _metrics(baseline, shifted.test)["ndcg@5"]
+            p_value = paired_bootstrap_pvalue(
+                _case_ndcg(policy, shifted.test),
+                _case_ndcg(baseline, shifted.test),
+                seed=self.seed,
+            )
             points.append(
                 RobustnessPoint(
                     offset=offset,
                     baseline_ndcg=baseline_ndcg,
                     evolved_ndcg=evolved_ndcg,
                     delta=evolved_ndcg - baseline_ndcg,
+                    p_value=p_value,
                 )
             )
         return points

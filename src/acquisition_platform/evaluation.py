@@ -496,3 +496,131 @@ def cohens_d(a: Sequence[float], b: Sequence[float]) -> float:
     if pooled == 0.0:
         return 0.0
     return (mean_a - mean_b) / pooled
+
+
+def holm_bonferroni(p_values: Sequence[float], alpha: float = 0.05) -> list[bool]:
+    """Holm-Bonferroni step-down correction for multiple comparisons.
+
+    Controls the family-wise error rate without assuming independence, which
+    makes it the right correction for a set of shift points that share data.
+
+    Args:
+        p_values: Raw p-values, one per hypothesis.
+        alpha: Family-wise error rate, in (0, 1).
+
+    Returns:
+        One rejection flag per input, in input order. Rejections form a prefix
+        of the ascending p-value order; the first failure stops the procedure.
+
+    Raises:
+        InvalidRangeError: If ``alpha`` is outside (0, 1) or any p-value is
+            outside [0, 1].
+    """
+    if not 0.0 < alpha < 1.0:
+        raise InvalidRangeError(f"alpha must be in (0, 1), got {alpha}")
+    for value in p_values:
+        if not 0.0 <= value <= 1.0:
+            raise InvalidRangeError(f"p-value must be in [0, 1], got {value}")
+    if not p_values:
+        return []
+
+    total = len(p_values)
+    order = sorted(range(total), key=lambda index: p_values[index])
+    decisions = [False] * total
+    for position, index in enumerate(order):
+        threshold = alpha / (total - position)
+        if p_values[index] <= threshold:
+            decisions[index] = True
+        else:
+            break
+    return decisions
+
+
+def minimum_detectable_effect(
+    standard_deviation: float,
+    sample_size: int,
+    power: float = 0.8,
+    alpha: float = 0.05,
+) -> float:
+    """Smallest detectable mean difference for a two-sided paired test.
+
+    Uses the normal approximation ``(z_{1-alpha/2} + z_{power}) * sd / sqrt(n)``.
+    Report this alongside any measured effect so a null result can be
+    distinguished from an underpowered one.
+
+    Args:
+        standard_deviation: Standard deviation of the paired differences.
+        sample_size: Number of paired observations.
+        power: Desired power, in (0, 1).
+        alpha: Two-sided significance level, in (0, 1).
+
+    Returns:
+        The minimum detectable effect in the units of the input.
+
+    Raises:
+        InvalidRangeError: If any argument is outside its valid range.
+    """
+    if standard_deviation <= 0.0:
+        raise InvalidRangeError(
+            f"standard_deviation must be positive, got {standard_deviation}"
+        )
+    if sample_size < 2:
+        raise InvalidRangeError(f"sample_size must be at least 2, got {sample_size}")
+    if not 0.0 < power < 1.0:
+        raise InvalidRangeError(f"power must be in (0, 1), got {power}")
+    if not 0.0 < alpha < 1.0:
+        raise InvalidRangeError(f"alpha must be in (0, 1), got {alpha}")
+
+    normal = statistics.NormalDist()
+    multiplier = normal.inv_cdf(1.0 - alpha / 2.0) + normal.inv_cdf(power)
+    return multiplier * standard_deviation / math.sqrt(sample_size)
+
+
+def hypervolume_2d(
+    points: Sequence[Sequence[float]], reference: Sequence[float]
+) -> float:
+    """Exact dominated hypervolume for a two-objective maximisation problem.
+
+    Args:
+        points: Objective vectors, each of length 2.
+        reference: Worst point defining the lower corner of the dominated
+            region, length 2.
+
+    Returns:
+        Area of the region dominated by at least one point and bounded by
+        ``reference``. Points at or below the reference contribute nothing.
+
+    Raises:
+        ValidationError: If any point or the reference is not two-dimensional.
+    """
+    if len(reference) != 2:
+        raise ValidationError(
+            f"reference must have exactly 2 values, got {len(reference)}"
+        )
+    for point in points:
+        if len(point) != 2:
+            raise ValidationError(
+                f"each point must have exactly 2 values, got {len(point)}"
+            )
+
+    ref_first, ref_second = float(reference[0]), float(reference[1])
+    kept: list[tuple[float, float]] = []
+    best_second = ref_second
+    candidates = sorted(
+        (
+            (float(point[0]), float(point[1]))
+            for point in points
+            if point[0] > ref_first and point[1] > ref_second
+        ),
+        key=lambda pair: -pair[0],
+    )
+    for first, second in candidates:
+        if second > best_second:
+            kept.append((first, second))
+            best_second = second
+
+    volume = 0.0
+    for position, (first, second) in enumerate(kept):
+        next_first = kept[position + 1][0] if position + 1 < len(kept) else ref_first
+        volume += (first - next_first) * (second - ref_second)
+    return volume

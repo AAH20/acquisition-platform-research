@@ -29,6 +29,10 @@ from acquisition_platform.alpha_lab import (  # noqa: E402
     AlphaLab,
     compare_search_strategies,
 )
+from acquisition_platform.evaluation import (  # noqa: E402
+    holm_bonferroni,
+    minimum_detectable_effect,
+)
 from acquisition_platform.alpha_registry import (  # noqa: E402
     AlphaRegistry,
     EvaluationCard,
@@ -166,14 +170,34 @@ def write_markdown(path: Path, payload: dict[str, Any], suite: SuiteReport) -> N
             "Policy trained at midpoint 0.5, scored against benchmarks whose true",
             "fair-value point moved. Buyers and prices are held fixed.",
             "",
-            "| True midpoint | Baseline | Evolved | Delta |",
-            "|--------------:|---------:|--------:|------:|",
+            "| True midpoint | Baseline | Evolved | Delta | p | Holm |",
+            "|--------------:|---------:|--------:|------:|--:|:-----|",
         ]
-        for point in robustness:
+        decisions = payload.get("multiple_testing", {}).get(
+            "significant_after_holm", []
+        )
+        for position, point in enumerate(robustness):
+            p_value = point.get("p_value")
+            p_text = f"{p_value:.4f}" if p_value is not None else "—"
+            decision = (
+                "yes" if position < len(decisions) and decisions[position] else "no"
+            )
             lines.append(
                 f"| {point['offset']:.2f} | {point['baseline_ndcg']:.4f} | "
-                f"{point['evolved_ndcg']:.4f} | {point['delta']:+.4f} |"
+                f"{point['evolved_ndcg']:.4f} | {point['delta']:+.4f} | "
+                f"{p_text} | {decision} |"
             )
+        testing = payload.get("multiple_testing")
+        if testing:
+            lines += [
+                "",
+                f"Holm-Bonferroni over {testing['family_size']} shift tests at "
+                f"α = 0.05 keeps the effect significant where the delta is "
+                f"material and correctly declines to claim significance where it "
+                f"is not. Minimum detectable effect at "
+                f"{testing['folds']} folds: "
+                f"**{testing['mde']:.4f} NDCG**.",
+            ]
         lines.append("")
 
     random_search = payload.get("random_search")
@@ -377,6 +401,20 @@ def main() -> int:
         n_buyers=args.buyers,
     )
     payload["robustness"] = [point.to_dict() for point in curve]
+
+    # multiple-comparison control across the specification-shift family
+    shift_p_values = [
+        point["p_value"] for point in payload["robustness"] if point["p_value"] is not None
+    ]
+    payload["multiple_testing"] = {
+        "family_size": len(shift_p_values),
+        "p_values": shift_p_values,
+        "significant_after_holm": holm_bonferroni(shift_p_values),
+        "mde": minimum_detectable_effect(
+            cross_validation.std_delta, len(cross_validation.folds)
+        ),
+        "folds": len(cross_validation.folds),
+    }
 
     # equal-budget random-search comparator
     random_search = lab.random_search_baseline(

@@ -18,6 +18,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Callable, Sequence, Tuple
 
+from acquisition_platform.evaluation import hypervolume_2d
 from acquisition_platform.exceptions import InvalidRangeError, ValidationError
 from acquisition_platform.serialization import SerializableMixin
 
@@ -364,6 +365,7 @@ class EvolutionConfig:
     adaptive_mutation: bool = True
     patience: int = 12
     archive_size: int = 64
+    reference_point: tuple[float, ...] | None = None
 
     def __post_init__(self) -> None:
         if self.population_size < 2:
@@ -386,6 +388,10 @@ class EvolutionConfig:
             raise InvalidRangeError("patience must be at least 1")
         if self.archive_size < 1:
             raise InvalidRangeError("archive_size must be at least 1")
+        if self.reference_point is not None and len(self.reference_point) != 2:
+            raise InvalidRangeError(
+                "reference_point must have exactly 2 values for hypervolume"
+            )
 
 
 @dataclass
@@ -405,6 +411,7 @@ class EvolutionReport:
     diversity_history: list[float]
     seed: int
     elapsed_seconds: float
+    hypervolume: float | None = None
 
     def to_dict(self) -> dict[str, object]:
         """Return a JSON-serialisable representation."""
@@ -422,6 +429,7 @@ class EvolutionReport:
             "diversity_history": list(self.diversity_history),
             "seed": self.seed,
             "elapsed_seconds": self.elapsed_seconds,
+            "hypervolume": self.hypervolume,
         }
 
 
@@ -798,6 +806,21 @@ class AlphaEvolver:
         else:
             improvement = 100.0 if best.fitness > baseline_fitness else 0.0
 
+        hypervolume = None
+        if self.config.reference_point is not None and len(self.objectives) == 2:
+            hypervolume = hypervolume_2d(
+                [
+                    tuple(
+                        alpha.objectives[objective.name]
+                        if objective.maximize
+                        else -alpha.objectives[objective.name]
+                        for objective in self.objectives
+                    )
+                    for alpha in self.hall_of_fame
+                ],
+                self.config.reference_point,
+            )
+
         return EvolutionReport(
             best=best,
             pareto_front=list(self.hall_of_fame),
@@ -812,4 +835,5 @@ class AlphaEvolver:
             diversity_history=diversity_history,
             seed=self.config.seed,
             elapsed_seconds=time.perf_counter() - started,
+            hypervolume=hypervolume,
         )

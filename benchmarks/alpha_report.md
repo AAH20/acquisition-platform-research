@@ -1,6 +1,6 @@
 # Alpha Report — Evolved Matching Policy
 
-Seed **7**, population **2381 evaluations** across **40 generations** in 9.68s.
+Seed **7**, population **2381 evaluations** across **40 generations** in 9.26s.
 
 ## Hold-out performance
 
@@ -40,14 +40,16 @@ Mean delta **+0.2358** ± 0.0254; win rate **100%**; p = 0.0000.
 Policy trained at midpoint 0.5, scored against benchmarks whose true
 fair-value point moved. Buyers and prices are held fixed.
 
-| True midpoint | Baseline | Evolved | Delta |
-|--------------:|---------:|--------:|------:|
-| 0.40 | 0.9269 | 0.9106 | -0.0163 |
-| 0.45 | 0.8674 | 0.9724 | +0.1050 |
-| 0.50 | 0.7667 | 1.0000 | +0.2333 |
-| 0.55 | 0.6291 | 0.9601 | +0.3311 |
-| 0.60 | 0.4676 | 0.8482 | +0.3806 |
-| 0.65 | 0.3128 | 0.7203 | +0.4075 |
+| True midpoint | Baseline | Evolved | Delta | p | Holm |
+|--------------:|---------:|--------:|------:|--:|:-----|
+| 0.40 | 0.9269 | 0.9106 | -0.0163 | 0.1520 | no |
+| 0.45 | 0.8674 | 0.9724 | +0.1050 | 0.0000 | yes |
+| 0.50 | 0.7667 | 1.0000 | +0.2333 | 0.0000 | yes |
+| 0.55 | 0.6291 | 0.9601 | +0.3311 | 0.0000 | yes |
+| 0.60 | 0.4676 | 0.8482 | +0.3806 | 0.0000 | yes |
+| 0.65 | 0.3128 | 0.7203 | +0.4075 | 0.0000 | yes |
+
+Holm-Bonferroni over 6 shift tests at α = 0.05 keeps the effect significant where the delta is material and correctly declines to claim significance where it is not. Minimum detectable effect at 5 folds: **0.0318 NDCG**.
 
 ## Search baseline
 
@@ -117,8 +119,8 @@ Alpha `matching-policy-s7` is at stage **canary**; promotion accepted: **False**
 
 | Case | Median ms | Target ms | Pass |
 |------|----------:|----------:|:----:|
-| matching_50x50 | 4.64 | 250.00 | yes |
+| matching_50x50 | 2.48 | 250.00 | yes |
 | ndcg_1000 | 0.06 | 10.00 | yes |
-| evolution_20x10 | 43.38 | 1500.00 | yes |
+| evolution_20x10 | 38.73 | 1500.00 | yes |
 
 Suite score: **3/3** cases inside target.

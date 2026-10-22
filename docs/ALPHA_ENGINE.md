@@ -257,6 +257,27 @@ and slightly overfit, so mean-rank aggregation adds noise instead of
 diversification. The ensemble is kept as a comparator; the single alpha remains
 the deployment default, and the actionable control is **refit cadence**.
 
+### Multiple comparisons and power
+
+Six shift points share one trained policy and overlapping buyers, so raw
+p-values overstate the evidence. Holm-Bonferroni at α = 0.05:
+
+| True midpoint | Delta | p | Significant (Holm) |
+|--------------:|------:|--:|:-------------------|
+| 0.40 | −0.0163 | 0.1520 | no |
+| 0.45 | +0.1050 | 0.0000 | yes |
+| 0.50 | +0.2333 | 0.0000 | yes |
+| 0.55 | +0.3311 | 0.0000 | yes |
+| 0.60 | +0.3806 | 0.0000 | yes |
+| 0.65 | +0.4075 | 0.0000 | yes |
+
+Minimum detectable effect from the 5-fold CV spread (sd 0.0254, 80% power):
+**0.0318 NDCG**. The measured cross-validation effect of +0.2358 is **7.4×**
+that, so the result is not an artefact of an underpowered test. Equally, the
+−0.0163 at midpoint 0.40 is **below** the MDE — it should be read as "no
+detectable difference", not as a loss. Reporting the MDE is what makes that
+distinction possible.
+
 ---
 
 ## 6. Interpretation and limits
@@ -299,6 +320,13 @@ maximum age for a production alpha and promotion should require a walk-forward
 result, not a single-split one. Ensembling does not substitute for refitting:
 it scored 0.004 below the single alpha because the front members were
 correlated and slightly overfit.
+
+**Significance needs a family, not a p-value.** Six shift comparisons were
+tested against one policy; Holm-Bonferroni leaves five significant and turns
+the 0.40 point into a null. With an MDE of 0.0318 the study can detect effects a
+third the size of the measured +0.2358, so the positive result is well powered
+and the 0.40 null is a genuine "no detectable difference" rather than noise
+masquerading as a reversal. Report the MDE with every null.
 
 ---
 
