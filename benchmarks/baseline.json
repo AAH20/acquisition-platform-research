@@ -6,26 +6,26 @@
   "results": [
     {
       "name": "matching_50x50",
-      "value": 3.6078710108995438,
+      "value": 4.083942010765895,
       "target": 250.0,
       "passed": true,
-      "duration_ms": 3.6078710108995438,
+      "duration_ms": 4.083942010765895,
       "unit": "ms"
     },
     {
       "name": "ndcg_1000",
-      "value": 0.0588970142416656,
+      "value": 0.1158829836640507,
       "target": 10.0,
       "passed": true,
-      "duration_ms": 0.0588970142416656,
+      "duration_ms": 0.1158829836640507,
       "unit": "ms"
     },
     {
       "name": "evolution_20x10",
-      "value": 42.88651800015941,
+      "value": 42.706281994469464,
       "target": 1500.0,
       "passed": true,
-      "duration_ms": 42.88651800015941,
+      "duration_ms": 42.706281994469464,
       "unit": "ms"
     }
   ]

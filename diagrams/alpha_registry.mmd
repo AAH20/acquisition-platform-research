@@ -1,0 +1,20 @@
+stateDiagram-v2
+    [*] --> shadow: register(card)
+    shadow --> canary: promote() + gates pass
+    canary --> production: promote() + gates pass
+    shadow --> shadow: promote() + gate failure
+    canary --> canary: promote() + gate failure
+    shadow --> rolled_back: rollback(reason)
+    canary --> rolled_back: rollback(reason)
+    production --> rolled_back: rollback(reason)
+    rolled_back --> [*]
+
+    note right of shadow
+        Gates: min_ndcg, min_delta,
+        max_p_value, max_generalization_gap
+    end note
+
+    note right of production
+        Terminal for promotion.
+        Rollback remains available.
+    end note

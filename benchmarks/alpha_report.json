@@ -1264,7 +1264,7 @@
       0.02234352203811969
     ],
     "seed": 7,
-    "elapsed_seconds": 9.51143278600648
+    "elapsed_seconds": 9.839444067998556
   },
   "selected_alpha": {
     "alpha_id": "a000-0056",
@@ -1332,7 +1332,129 @@
     "train_cases": 72,
     "test_cases": 48,
     "benchmark_fingerprint": "e7423ecd20acbb85",
-    "wall_seconds": 9.551
+    "wall_seconds": 9.882
+  },
+  "cross_validation": {
+    "n_splits": 5,
+    "folds": [
+      {
+        "fold": 0,
+        "train_size": 96,
+        "test_size": 24,
+        "baseline_ndcg": 0.7338268338718716,
+        "evolved_ndcg": 1.0,
+        "delta": 0.26617316612812836
+      },
+      {
+        "fold": 1,
+        "train_size": 96,
+        "test_size": 24,
+        "baseline_ndcg": 0.7459206685359722,
+        "evolved_ndcg": 0.9999783850380229,
+        "delta": 0.2540577165020508
+      },
+      {
+        "fold": 2,
+        "train_size": 96,
+        "test_size": 24,
+        "baseline_ndcg": 0.807988075560992,
+        "evolved_ndcg": 0.9999990974122044,
+        "delta": 0.19201102185121244
+      },
+      {
+        "fold": 3,
+        "train_size": 96,
+        "test_size": 24,
+        "baseline_ndcg": 0.7711422263317079,
+        "evolved_ndcg": 1.0,
+        "delta": 0.22885777366829207
+      },
+      {
+        "fold": 4,
+        "train_size": 96,
+        "test_size": 24,
+        "baseline_ndcg": 0.7623334528685342,
+        "evolved_ndcg": 1.0,
+        "delta": 0.23766654713146584
+      }
+    ],
+    "mean_delta": 0.2357532450562299,
+    "std_delta": 0.02539691167973753,
+    "mean_evolved_ndcg": 0.9999954964900455,
+    "mean_baseline_ndcg": 0.7642422514338156,
+    "win_rate": 1.0,
+    "p_value": 0.0
+  },
+  "robustness": [
+    {
+      "offset": 0.4,
+      "baseline_ndcg": 0.9269080319910222,
+      "evolved_ndcg": 0.9105705836334397,
+      "delta": -0.01633744835758255
+    },
+    {
+      "offset": 0.45,
+      "baseline_ndcg": 0.8673639235039267,
+      "evolved_ndcg": 0.9723966906436937,
+      "delta": 0.10503276713976706
+    },
+    {
+      "offset": 0.5,
+      "baseline_ndcg": 0.7667378396001211,
+      "evolved_ndcg": 1.0,
+      "delta": 0.2332621603998789
+    },
+    {
+      "offset": 0.55,
+      "baseline_ndcg": 0.6290567250248402,
+      "evolved_ndcg": 0.9601364347684903,
+      "delta": 0.3310797097436501
+    },
+    {
+      "offset": 0.6,
+      "baseline_ndcg": 0.4675615494397209,
+      "evolved_ndcg": 0.8481905810047374,
+      "delta": 0.38062903156501654
+    },
+    {
+      "offset": 0.65,
+      "baseline_ndcg": 0.3128165634890249,
+      "evolved_ndcg": 0.720311679195361,
+      "delta": 0.40749511570633606
+    }
+  ],
+  "random_search": {
+    "params": {
+      "gap_weight": 0.3504075121575029,
+      "midpoint_weight": 0.5486600439867791,
+      "size_weight": 0.1309838520094504,
+      "bias": -0.19430282473755778
+    },
+    "train_ndcg@5": 1.0,
+    "test_ndcg@5": 1.0,
+    "evaluations": 2381
+  },
+  "search_comparison": {
+    "function": "rastrigin",
+    "dimensions": 5,
+    "budget": 2381,
+    "evolutionary_best": 0.0,
+    "random_best": -25.335196198476652,
+    "evolutionary_evals": 497,
+    "random_evals": 2381,
+    "wall_seconds": 0.1880928460159339
+  },
+  "registry": {
+    "alpha_id": "matching-policy-s7",
+    "decision": {
+      "promoted": false,
+      "stage": "canary",
+      "reasons": [
+        "alpha already registered (idempotent run)"
+      ]
+    },
+    "stage": "canary",
+    "chain_verified": true
   },
   "latency": {
     "name": "platform-core",
@@ -1342,26 +1464,26 @@
     "results": [
       {
         "name": "matching_50x50",
-        "value": 2.515983011107892,
+        "value": 2.6022550009656698,
         "target": 250.0,
         "passed": true,
-        "duration_ms": 2.515983011107892,
+        "duration_ms": 2.6022550009656698,
         "unit": "ms"
       },
       {
         "name": "ndcg_1000",
-        "value": 0.0579599873162806,
+        "value": 0.05472099292092025,
         "target": 10.0,
         "passed": true,
-        "duration_ms": 0.0579599873162806,
+        "duration_ms": 0.05472099292092025,
         "unit": "ms"
       },
       {
         "name": "evolution_20x10",
-        "value": 40.449624008033425,
+        "value": 37.5830740085803,
         "target": 1500.0,
         "passed": true,
-        "duration_ms": 40.449624008033425,
+        "duration_ms": 37.5830740085803,
         "unit": "ms"
       }
     ]

@@ -1,6 +1,6 @@
 # Acquisition Platform Research & Optimization
 
-> **Unified optimization engine for acquisition/auction platforms.** 100-agent parallel research across 8 platforms + 30+ dual-use verticals, 30 NP-hard problem solvers, an NSGA-II alpha-evolution engine, 1302 tests, 53 source modules, 6 architecture diagrams.
+> **Unified optimization engine for acquisition/auction platforms.** 100-agent parallel research across 8 platforms + 30+ dual-use verticals, 30 NP-hard problem solvers, an NSGA-II alpha-evolution engine, 1342 tests, 54 source modules, 7 architecture diagrams.
 
 ## Table of Contents
 
@@ -35,10 +35,10 @@ This project is a unified research and optimization engine for acquisition and a
 | Platforms analyzed | 8 |
 | Dual-use verticals researched | 30+ |
 | NP-hard problems solved | 30 |
-| Source modules | 53 |
-| Test files | 58 |
-| Tests passing | 1302 |
-| Architecture diagrams | 6 |
+| Source modules | 54 |
+| Test files | 60 |
+| Tests passing | 1342 |
+| Architecture diagrams | 7 |
 | Lines of code | ~17,000+ |
 | Research documents | 50+ |
 | Alpha-evolution NDCG@5 | 0.7667 → 1.0000 (held-out) |
@@ -66,7 +66,23 @@ split.
 - 95% bootstrap CI on NDCG@5 improvement: **[+0.1952, +0.2773]**
 - Paired bootstrap **p < 0.0001**
 - Latent-weight recovery L1 error **0.0653**; train/test gap **0.0000**
-- 2,381 evaluations in 9.55 s; Pareto archive of 64 policies
+- 5-fold cross-validation: **+0.2358 ± 0.0254**, 100% of folds improved
+- 2,381 evaluations in 13.02 s; Pareto archive of 64 policies
+
+**Where the gains survive — and where they do not.** Re-running the whole
+procedure on five disjoint folds reproduces the effect (+0.2358 ± 0.0254, win
+rate 100%). Under specification shift the evolved policy beats the legacy
+heuristic at every true midpoint from 0.45 to 0.65, and trails by 0.016 at 0.40.
+At equal budget **random search also reaches 1.0000** on this four-parameter
+policy, so the matching benchmark cannot separate search strategies; on 5-D
+Rastrigin the evolver reaches the global optimum in **497 evaluations** while
+random search spends 2,381 and stalls at −25.34. Both results are reported in
+`benchmarks/alpha_report.md`.
+
+**Governance.** `AlphaRegistry` is an append-only, hash-chained event log with
+shadow → canary → production stages and promotion gates. The measured alpha
+passes every gate and is promoted to canary with the chain verified; a tamper
+test rewrites a stored metric and confirms `verify()` returns `False`.
 
 ```python
 from acquisition_platform import AlphaLab, AlphaEvolver, EvolutionConfig, Objective, ParamSpec
@@ -759,7 +775,15 @@ Cohen's d). No third-party dependencies.
 
 Builds a deterministic labelled matching benchmark, evolves `MatchingPolicy`
 weights against the training split, and reports held-out metrics, recovered
-weights, generalisation gap, CI, and p-value.
+weights, generalisation gap, CI, and p-value. Also provides k-fold
+cross-validation, a specification-shift curve, an equal-budget random-search
+comparator, and an optimizer benchmark on multimodal objectives.
+
+#### `alpha_registry.py` — Lifecycle & Audit
+
+Append-only hash-chained event log. `register`, `promote` (gate-checked),
+`rollback`; `verify()` recomputes every hash and link. Editing history is
+detectable, and promotion refusals name each failed gate.
 
 #### `benchmark_suite.py` — Regression Gate
 
@@ -1518,6 +1542,7 @@ acquisition-platform-research/
 │       ├── evolution.py             # Evolution framework (GA + NSGA-II alpha engine)
 │       ├── evaluation.py            # Metrics, bootstrap CI, paired p-value
 │       ├── alpha_lab.py             # Policy evolution against labelled benchmark
+│       ├── alpha_registry.py        # Hash-chained alpha lifecycle and gates
 │       ├── benchmark_suite.py       # Latency suite with regression gate
 │       ├── exceptions.py            # Custom exceptions
 │       ├── export_control.py        # Export control (ITAR/EAR)

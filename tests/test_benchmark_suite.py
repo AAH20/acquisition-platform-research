@@ -110,3 +110,20 @@ class TestRegressionGate:
         regressions = current.compare_to_baseline(baseline, tolerance=0.1)
         assert len(regressions) == 1
         assert regressions[0].regressed is True
+
+    def test_noise_floor_suppresses_microbenchmark_jitter(self):
+        baseline = self._report(3.7)
+        current = self._report(5.0)  # +35% but only 1.3 ms
+        regressions = current.compare_to_baseline(
+            baseline, tolerance=0.25, noise_floor_ms=2.0
+        )
+        assert regressions == []
+
+    def test_noise_floor_does_not_mask_real_regression(self):
+        baseline = self._report(3.7)
+        current = self._report(6.2)  # +68% and +2.5 ms
+        regressions = current.compare_to_baseline(
+            baseline, tolerance=0.25, noise_floor_ms=2.0
+        )
+        assert len(regressions) == 1
+        assert regressions[0].regressed is True

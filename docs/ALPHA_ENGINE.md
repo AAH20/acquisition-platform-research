@@ -141,18 +141,66 @@ L1 recovery error **0.0653**.
 
 | Case | Median | Target |
 |------|-------:|-------:|
-| matching 50×50 | 3.61 ms | 250 ms |
+| matching 50×50 | 2.70 ms | 250 ms |
 | ndcg over 1,000 | 0.06 ms | 10 ms |
-| evolution 20×10 | 42.89 ms | 1,500 ms |
+| evolution 20×10 | 39.03 ms | 1,500 ms |
+
+### Cross-validation
+
+The single split above could be lucky. Re-running the entire procedure on five
+disjoint folds, each with its own seed, gives:
+
+| Fold | Train | Test | Baseline | Evolved | Delta |
+|-----:|------:|-----:|---------:|--------:|------:|
+| 0 | 96 | 24 | 0.7338 | 1.0000 | +0.2662 |
+| 1 | 96 | 24 | 0.7459 | 1.0000 | +0.2541 |
+| 2 | 96 | 24 | 0.8080 | 1.0000 | +0.1920 |
+| 3 | 96 | 24 | 0.7711 | 1.0000 | +0.2289 |
+| 4 | 96 | 24 | 0.7623 | 1.0000 | +0.2377 |
+
+Mean delta **+0.2358 ± 0.0254**, win rate **100%**, p = 0.0000. The effect is
+not an artefact of one split.
+
+### Specification shift
+
+The policy is trained at midpoint 0.5, then scored against benchmarks whose true
+fair-value point moves while buyers and prices are held fixed:
+
+| True midpoint | Legacy | Evolved | Delta |
+|--------------:|-------:|--------:|------:|
+| 0.40 | 0.9269 | 0.9106 | −0.0163 |
+| 0.45 | 0.8674 | 0.9724 | +0.1050 |
+| 0.50 | 0.7667 | 1.0000 | +0.2333 |
+| 0.55 | 0.6291 | 0.9601 | +0.3311 |
+| 0.60 | 0.4676 | 0.8482 | +0.3806 |
+| 0.65 | 0.3128 | 0.7203 | +0.4075 |
+
+Degradation is asymmetric. Moving the true midpoint **upward** hurts most
+(1.0000 → 0.7203 at 0.65) because the size feature only partly substitutes for
+a higher fair-value centre. Moving it **downward** barely matters: at 0.40 the
+evolved policy is 0.016 points behind the legacy heuristic, which is nearly
+optimal there by construction.
+
+### Search strategy attribution
+
+| Function | Dims | Evolutionary best | Evals | Random best | Evals |
+|----------|-----:|------------------:|------:|------------:|------:|
+| Rastrigin | 5 | 0.0000 | 497 | −25.3352 | 2,381 |
+
+At equal budget, **random search also reaches 1.0000 NDCG@5** on the matching
+policy. The landscape is smooth and four-dimensional, so this benchmark cannot
+separate search strategies — a negative result about the benchmark, reported
+rather than hidden. On a multimodal objective the evolver reaches the global
+optimum with roughly one fifth of random search's evaluations.
 
 ---
 
 ## 6. Interpretation and limits
 
 **What the result proves.** The optimiser recovers a latent ranking function to
-within 7% L1 weight error and closes the entire ranking gap on held-out buyers
-without overfitting (zero train/test gap). That is a convergence and
-generalisation test of the search procedure.
+within 7% L1 weight error, closes the entire ranking gap on held-out buyers, and
+generalises without overfitting (zero train/test gap; 5/5 folds positive). That
+is a convergence and generalisation test of the search procedure.
 
 **What it does not prove.** The benchmark's utility lies inside the policy
 family, so NDCG saturates at 1.0 by construction. This is a **recoverability**
@@ -160,14 +208,54 @@ result, not a market-alpha claim. Serving this policy against real buyers
 requires re-estimating the latent weights from transaction data; the benchmark
 cannot tell you what those weights are.
 
-**Next falsifiable test.** Hold the evolved weights fixed, then evaluate on a
-split whose latent midpoint is shifted to 0.6·budget. A collapse in NDCG would
-quantify sensitivity to specification error; a graceful decay would support
-deployment as a prior.
+**Search attribution.** Because random search ties on this policy, the
+matching-policy experiment says nothing about evolutionary search efficiency.
+The Rastrigin comparison is the evidence for that claim, and it is scoped to
+multimodal objectives.
+
+**Specification sensitivity (measured).** The evolved policy dominates the
+legacy heuristic at every shift except 0.40, where it trails by 0.016. Upward
+shifts are the material risk: at a true midpoint of 0.65 the policy retains
+0.7203 NDCG, still far above the legacy 0.3128 but well below its ceiling.
+Deployment as a prior should therefore be paired with periodic re-estimation of
+the midpoint, not treated as a fixed policy.
 
 ---
 
-## 7. Mutation-testing evidence
+## 7. Governance: registry and promotion
+
+Measurement alone does not control risk; the artifact needs a lifecycle.
+`alpha_registry.py` is an append-only, hash-chained event log: register →
+promote → rollback, where each record commits to the previous record's hash.
+Editing a stored metric breaks `verify()`, which is the property an audit needs
+and a mutable status table cannot provide.
+
+Stages: **shadow → canary → production**, with rollback available from any
+stage. Promotion is refused unless every gate passes, and the refusal names each
+failure.
+
+```python
+from acquisition_platform import AlphaRegistry, EvaluationCard, PromotionGate
+
+registry = AlphaRegistry("benchmarks/alpha_registry.json")
+registry.register(card)                      # shadow
+decision = registry.promote(
+    card.alpha_id,
+    PromotionGate(min_ndcg=0.90, min_delta=0.05, max_p_value=0.05),
+)
+# PromotionDecision(promoted=True, stage='canary', reasons=())
+```
+
+Gates measured on this run: NDCG 1.0000 ≥ 0.90; delta 0.2333 ≥ 0.05;
+p 0.0000 ≤ 0.05; gap 0.0000 ≤ 0.10 → promoted to canary, chain verified.
+The tamper test rewrites a stored NDCG in the JSON file, reloads the registry,
+and asserts `verify()` returns `False`.
+
+Lifecycle diagram: `diagrams/alpha_registry.mmd`.
+
+---
+
+## 8. Mutation-testing evidence
 
 Two deliberate source mutations were applied and reverted:
 
@@ -184,7 +272,7 @@ fitness — now have tests that die when the rule is removed.
 
 ---
 
-## 8. Extending the engine
+## 9. Extending the engine
 
 ```python
 from acquisition_platform.evolution import (
@@ -216,15 +304,18 @@ objectives, declare constraints, write a deterministic evaluator, evolve.
 
 ---
 
-## 9. Reproduction checklist
+## 10. Reproduction checklist
 
 ```bash
 python -m pytest tests/test_evaluation.py tests/test_alpha_evolution.py \
                  tests/test_matching_policy.py tests/test_alpha_lab.py \
+                 tests/test_alpha_robustness.py tests/test_alpha_registry.py \
                  tests/test_benchmark_suite.py -v
 python benchmarks/evolve_alphas.py --buyers 120
 ```
 
 Artifacts: `benchmarks/alpha_report.json`, `benchmarks/alpha_report.md`,
-`benchmarks/baseline.json`. The script exits non-zero if any latency case
-regresses beyond 25% of its stored baseline.
+`benchmarks/baseline.json`, `benchmarks/alpha_registry.json`. The script exits
+non-zero if any latency case regresses beyond 25% **and** more than 2 ms over
+its stored baseline — the absolute floor exists because scheduler jitter can
+double a sub-5 ms median without any code change.

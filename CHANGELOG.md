@@ -13,11 +13,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Alpha lab (`alpha_lab.py`): labelled matching benchmark, policy evolution, held-out evaluation, latent-weight recovery
 - Benchmark suite (`benchmark_suite.py`): warmup/repeats, baseline persistence, regression gate
 - `MatchingPolicy`: injectable, evolvable scoring policy whose defaults preserve legacy behaviour
-- 87 new tests across five suites; mutation-tested invariants
+- Alpha registry (`alpha_registry.py`): append-only hash-chained event log with shadow → canary → production stages, gate-checked promotion, rollback, and tamper detection
+- Cross-validation (`AlphaLab.cross_validate`): k-fold re-run of the whole procedure with per-fold seeds
+- Specification-shift curve (`AlphaLab.robustness_curve`): held-out performance as the latent fair-value point moves
+- Search comparators: equal-budget random search and a multimodal (Rastrigin) benchmark that separates search strategies
+- Benchmark regression gate gains a measurement-noise floor for sub-5 ms cases
+- 128 new tests since the v0.1 baseline (1342 total); mutation-tested invariants
 
 ### Changed
 - `BuyerSellerMatcher` accepts an optional `MatchingPolicy`
 - Measured held-out NDCG@5: 0.7667 → 1.0000 (p < 0.0001, weight-recovery L1 0.0653, train/test gap 0.0000)
+- 5-fold CV: +0.2358 ± 0.0254, win rate 100%
+- Rastrigin 5-D: optimum reached in 497 evaluations vs random search −25.34 at 2,381
 
 ## [Unreleased]
 

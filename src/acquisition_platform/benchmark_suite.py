@@ -156,20 +156,28 @@ class SuiteReport:
         return cls.from_dict(payload)
 
     def compare_to_baseline(
-        self, baseline: "SuiteReport", tolerance: float = 0.10
+        self,
+        baseline: "SuiteReport",
+        tolerance: float = 0.10,
+        noise_floor_ms: float = 0.0,
     ) -> list[Regression]:
         """Compare durations against a baseline.
 
         Args:
             baseline: Reference report.
             tolerance: Fractional slowdown tolerated before flagging.
+            noise_floor_ms: Absolute slowdown that must also be exceeded. Use a
+                small floor for microbenchmarks, where scheduler jitter can
+                double a sub-5 ms median without any code change.
 
         Returns:
-            Regressions beyond ``tolerance`` plus every case missing from this
-            report.
+            Regressions beyond ``tolerance`` and ``noise_floor_ms``, plus every
+            case missing from this report.
         """
         if tolerance < 0:
             raise ValidationError("tolerance must be non-negative")
+        if noise_floor_ms < 0:
+            raise ValidationError("noise_floor_ms must be non-negative")
         baseline_by_name = {result.name: result for result in baseline.results}
         current_by_name = {result.name: result for result in self.results}
         regressions: list[Regression] = []
@@ -194,7 +202,9 @@ class SuiteReport:
                 change_pct = (
                     (current.value - baseline_result.value) / baseline_result.value * 100.0
                 )
-            if change_pct > tolerance * 100.0:
+            if change_pct > tolerance * 100.0 and (
+                current.value - baseline_result.value > noise_floor_ms
+            ):
                 regressions.append(
                     Regression(
                         name=name,

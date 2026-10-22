@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "events": [
+    {
+      "sequence": 0,
+      "event_type": "register",
+      "alpha_id": "matching-policy-s7",
+      "stage": "shadow",
+      "card": {
+        "alpha_id": "matching-policy-s7",
+        "params": {
+          "gap_weight": 0.3504075121575029,
+          "midpoint_weight": 0.5486600439867791,
+          "size_weight": 0.1309838520094504,
+          "bias": -0.19430282473755778
+        },
+        "metrics": {
+          "ndcg@5": 1.0,
+          "delta": 0.2332621603998789,
+          "generalization_gap": 0.0
+        },
+        "ci_low": 0.19523239400544393,
+        "ci_high": 0.2773155477520874,
+        "p_value": 0.0,
+        "dataset_fingerprint": "e7423ecd20acbb85",
+        "code_version": "0.2.0",
+        "seed": 7,
+        "created_at": "2026-10-22T02:05:39.707022+00:00"
+      },
+      "prev_hash": "",
+      "record_hash": "b461b981c01856fd56a1685685e6fc1350724e1a06b801ce127c4465ff7decc2",
+      "note": ""
+    },
+    {
+      "sequence": 1,
+      "event_type": "promote",
+      "alpha_id": "matching-policy-s7",
+      "stage": "canary",
+      "card": null,
+      "prev_hash": "b461b981c01856fd56a1685685e6fc1350724e1a06b801ce127c4465ff7decc2",
+      "record_hash": "4aa0835373337e99df2ca83ea36d27d8e4e1bd51f763d0194144cc472c9f1f3d",
+      "note": ""
+    }
+  ]
+}
