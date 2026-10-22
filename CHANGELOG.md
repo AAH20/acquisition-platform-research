@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-10-22
+
+### Added
+- Alpha evolution engine (`evolution.py`): `AlphaEvolver` — NSGA-II with multi-gene genomes, constraint domination, adaptive mutation, bounded Pareto archive, and seeded determinism
+- Evaluation library (`evaluation.py`): classification, ranking (AUC/AP/MAP/NDCG), regression, calibration, bootstrap CI, paired p-value, Cohen's d
+- Alpha lab (`alpha_lab.py`): labelled matching benchmark, policy evolution, held-out evaluation, latent-weight recovery
+- Benchmark suite (`benchmark_suite.py`): warmup/repeats, baseline persistence, regression gate
+- `MatchingPolicy`: injectable, evolvable scoring policy whose defaults preserve legacy behaviour
+- 87 new tests across five suites; mutation-tested invariants
+
+### Changed
+- `BuyerSellerMatcher` accepts an optional `MatchingPolicy`
+- Measured held-out NDCG@5: 0.7667 → 1.0000 (p < 0.0001, weight-recovery L1 0.0653, train/test gap 0.0000)
+
 ## [Unreleased]
 
 ### Added

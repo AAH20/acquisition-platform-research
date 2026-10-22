@@ -1,0 +1,32 @@
+{
+  "name": "platform-core",
+  "total": 3,
+  "passed": 3,
+  "score": 1.0,
+  "results": [
+    {
+      "name": "matching_50x50",
+      "value": 3.6078710108995438,
+      "target": 250.0,
+      "passed": true,
+      "duration_ms": 3.6078710108995438,
+      "unit": "ms"
+    },
+    {
+      "name": "ndcg_1000",
+      "value": 0.0588970142416656,
+      "target": 10.0,
+      "passed": true,
+      "duration_ms": 0.0588970142416656,
+      "unit": "ms"
+    },
+    {
+      "name": "evolution_20x10",
+      "value": 42.88651800015941,
+      "target": 1500.0,
+      "passed": true,
+      "duration_ms": 42.88651800015941,
+      "unit": "ms"
+    }
+  ]
+}

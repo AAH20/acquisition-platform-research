@@ -1,46 +1,54 @@
 flowchart TD
     subgraph Input["Input"]
-        DATA[Research Data]
-        BENCH[Benchmarks]
-        PARAMS[Parameters]
+        DATA["Research data / labelled benchmark"]
+        SPEC["ParamSpec search space"]
+        BASE["Baseline parameters"]
     end
 
-    subgraph Evolution["Evolution Engine"]
-        INIT[Initialize Population]
-        EVAL[Evaluate Fitness]
-        SELECT[Selection]
-        CROSS[Crossover]
-        MUTATE[Mutation]
-        REPLACEMENT[Replacement]
+    subgraph Evolution["AlphaEvolver (NSGA-II)"]
+        INIT["Initialise population<br/>seeded RNG + baseline"]
+        EVAL["Evaluate objectives"]
+        SORT["Fast non-dominated sort"]
+        CROWD["Crowding distance"]
+        SELECT["Tournament selection"]
+        CROSS["BLX-alpha crossover"]
+        MUTATE["Gaussian mutation<br/>adaptive sigma"]
+        MERGE["mu+lambda survival<br/>elitism"]
+        ARCHIVE["Pareto archive<br/>bounded"]
     end
 
-    subgraph Evaluation["Evaluation Framework"]
-        METRICS[Metrics Calculator]
-        COMPARISON[Comparison]
-        RANKING[Result Ranking]
-        VISUAL[Visualization]
+    subgraph Evaluation["Evaluation layer"]
+        METRICS["classification / ranking /<br/>regression / calibration"]
+        STATS["bootstrap CI<br/>paired p-value<br/>Cohen's d"]
+        GATE["BenchmarkSuite<br/>regression gate"]
     end
 
     subgraph Output["Output"]
-        BEST[Best Solution]
-        REPORT[Report]
-        DEPLOY[Deployment]
+        BEST["Best alpha + Pareto front"]
+        REPORT["EvolutionReport<br/>fitness/diversity history"]
+        ARTIFACT["alpha_report.json/.md"]
     end
 
-    Input --> Evolution
-    Evolution --> Evaluation
-    Evaluation --> Output
-
+    DATA --> INIT
+    SPEC --> INIT
+    BASE --> INIT
     INIT --> EVAL
-    EVAL --> SELECT
+    EVAL --> SORT
+    SORT --> CROWD
+    CROWD --> SELECT
     SELECT --> CROSS
     CROSS --> MUTATE
-    MUTATE --> REPLACEMENT
-    REPLACEMENT --> EVAL
-
-    METRICS --> COMPARISON
-    COMPARISON --> RANKING
-    RANKING --> VISUAL
+    MUTATE --> MERGE
+    MERGE --> SORT
+    SORT --> ARCHIVE
+    ARCHIVE --> EVAL
+    EVAL --> METRICS
+    METRICS --> STATS
+    STATS --> GATE
+    ARCHIVE --> BEST
+    MERGE --> REPORT
+    BEST --> ARTIFACT
+    GATE --> ARTIFACT
 
     style Input fill:#6e7681,stroke:#30363d,color:#fff
     style Evolution fill:#238636,stroke:#30363d,color:#fff

@@ -22,7 +22,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from acquisition_platform.exceptions import EmptyInputError, ValidationError
+from acquisition_platform.exceptions import EmptyInputError, InvalidRangeError, ValidationError
 from acquisition_platform.serialization import SerializableMixin
 
 
@@ -54,6 +54,89 @@ class Match(SerializableMixin):
     confidence: float
 
 
+@dataclass(frozen=True)
+class MatchingPolicy:
+    """Parameterised scoring policy for buyer-seller matching.
+
+    The score blends three interpretable signals:
+
+    - ``gap``: ``1 - asking_price / budget`` — cheaper deals score higher.
+    - ``midpoint``: ``1 - |asking_price - budget/2| / budget`` — deals priced
+      near half the buyer's budget score higher (a "fair value" signal).
+    - ``size``: ``min(1, asking_price / budget)`` — larger deals score higher.
+
+    The defaults (``gap_weight=1``, everything else zero) reproduce the legacy
+    scoring function exactly, so existing behaviour is preserved. Evolution can
+    then search the weight space to recover a better policy.
+
+    Args:
+        gap_weight: Weight of the budget-gap signal.
+        midpoint_weight: Weight of the fair-value signal.
+        size_weight: Weight of the deal-size signal.
+        bias: Constant added before scaling.
+        scale: Multiplier applied to the blended signal; must be positive.
+    """
+
+    gap_weight: float = 1.0
+    midpoint_weight: float = 0.0
+    size_weight: float = 0.0
+    bias: float = 0.0
+    scale: float = 1.0
+
+    def __post_init__(self) -> None:
+        if self.scale <= 0.0:
+            raise InvalidRangeError(f"scale must be positive, got {self.scale}")
+        if self.gap_weight < 0 or self.midpoint_weight < 0 or self.size_weight < 0:
+            raise InvalidRangeError("policy weights must be non-negative")
+        if self.gap_weight == 0 and self.midpoint_weight == 0 and self.size_weight == 0:
+            raise ValidationError("at least one policy weight must be positive")
+
+    def score(self, buyer: Buyer, seller: Seller) -> float:
+        """Score a feasible pair.
+
+        Args:
+            buyer: The buyer side of the pair.
+            seller: The seller side of the pair.
+
+        Returns:
+            Score clamped to [0, 1]; 0.0 for a non-positive budget.
+        """
+        if buyer.budget <= 0:
+            return 0.0
+        price_ratio = seller.asking_price / buyer.budget
+        gap = 1.0 - price_ratio
+        midpoint = 1.0 - abs(seller.asking_price - buyer.budget / 2.0) / buyer.budget
+        size = min(1.0, price_ratio)
+        blended = (
+            self.gap_weight * gap
+            + self.midpoint_weight * midpoint
+            + self.size_weight * size
+            + self.bias
+        )
+        return max(0.0, min(1.0, self.scale * blended))
+
+    def to_params(self) -> dict[str, float]:
+        """Return the policy as a flat parameter dictionary."""
+        return {
+            "gap_weight": self.gap_weight,
+            "midpoint_weight": self.midpoint_weight,
+            "size_weight": self.size_weight,
+            "bias": self.bias,
+            "scale": self.scale,
+        }
+
+    @classmethod
+    def from_params(cls, params: dict[str, float]) -> "MatchingPolicy":
+        """Build a policy from a flat parameter dictionary."""
+        return cls(
+            gap_weight=params.get("gap_weight", 1.0),
+            midpoint_weight=params.get("midpoint_weight", 0.0),
+            size_weight=params.get("size_weight", 0.0),
+            bias=params.get("bias", 0.0),
+            scale=params.get("scale", 1.0),
+        )
+
+
 class BuyerSellerMatcher:
     """Greedy GAP solver for matching buyers to sellers.
 
@@ -61,6 +144,15 @@ class BuyerSellerMatcher:
     it generates all feasible pairs, scores them, and assigns them in descending
     score order while respecting the one-to-one matching constraint.
     """
+
+    def __init__(self, policy: MatchingPolicy | None = None) -> None:
+        """Initialise the matcher.
+
+        Args:
+            policy: Optional scoring policy. Defaults to the legacy policy,
+                which scores purely on the budget gap.
+        """
+        self.policy = policy or MatchingPolicy()
 
     def match(self, buyers: list[Buyer], sellers: list[Seller]) -> list[Match]:
         """Match buyers to sellers using greedy GAP approximation.
@@ -195,20 +287,18 @@ class BuyerSellerMatcher:
     def _compute_score(self, buyer: Buyer, seller: Seller) -> float:
         """Compute the match score for a feasible pair.
 
-        Score = (1 - asking_price / budget) * category_match_bonus
+        Delegates to :class:`MatchingPolicy`. The default policy scores
+        ``1 - asking_price / budget`` clamped to [0, 1], preserving the
+        historical behaviour of this matcher.
 
-        Since category mismatch results in no match, the category_match_bonus
-        is always 1.0 for feasible pairs. The score is clamped to [0, 1].
+        Args:
+            buyer: The buyer side of the pair.
+            seller: The seller side of the pair.
 
-        A higher score indicates a better match: the seller's asking price is
-        a smaller fraction of the buyer's budget.
+        Returns:
+            Match score in [0, 1].
         """
-        if buyer.budget <= 0:
-            return 0.0
-        price_ratio = seller.asking_price / buyer.budget
-        category_bonus = 1.0  # Always 1.0 since mismatches are filtered out
-        score = (1.0 - price_ratio) * category_bonus
-        return max(0.0, min(1.0, score))
+        return self.policy.score(buyer, seller)
 
     def _compute_confidence(self, buyer: Buyer, seller: Seller, score: float) -> float:
         """Compute the confidence score for a match.

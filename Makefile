@@ -1,4 +1,4 @@
-.PHONY: install test lint typecheck format clean benchmark all
+.PHONY: install test lint typecheck format clean benchmark alpha all
 
 install:
 	pip install -e '.[dev]'
@@ -26,5 +26,8 @@ clean:
 
 benchmark:
 	python -m pytest tests/ --benchmark-only
+
+alpha:
+	python benchmarks/evolve_alphas.py --buyers 120
 
 all: install test lint typecheck

@@ -1,10 +1,11 @@
 # Acquisition Platform Research & Optimization
 
-> **Unified optimization engine for acquisition/auction platforms.** 100-agent parallel research across 8 platforms + 30+ dual-use verticals, 30 NP-hard problem solvers, 1018 tests, 43 source modules, 5 architecture diagrams.
+> **Unified optimization engine for acquisition/auction platforms.** 100-agent parallel research across 8 platforms + 30+ dual-use verticals, 30 NP-hard problem solvers, an NSGA-II alpha-evolution engine, 1302 tests, 53 source modules, 6 architecture diagrams.
 
 ## Table of Contents
 
 - [Overview](#overview)
+- [Alpha Evolution Engine](#alpha-evolution-engine)
 - [Research Coverage](#research-coverage)
 - [Architecture](#architecture)
 - [NP-Hard Problems](#np-hard-problems)
@@ -34,12 +35,56 @@ This project is a unified research and optimization engine for acquisition and a
 | Platforms analyzed | 8 |
 | Dual-use verticals researched | 30+ |
 | NP-hard problems solved | 30 |
-| Source modules | 43 |
-| Test files | 40+ |
-| Tests passing | 1018 |
-| Architecture diagrams | 5 |
-| Lines of code | ~15,000+ |
+| Source modules | 53 |
+| Test files | 58 |
+| Tests passing | 1302 |
+| Architecture diagrams | 6 |
+| Lines of code | ~17,000+ |
 | Research documents | 50+ |
+| Alpha-evolution NDCG@5 | 0.7667 → 1.0000 (held-out) |
+
+---
+
+## Alpha Evolution Engine
+
+The platform does not only solve NP-hard problems — it **evolves the decision
+policies** that use them. `AlphaEvolver` is a multi-gene, multi-objective
+NSGA-II engine with constraint domination, a bounded Pareto archive, adaptive
+mutation, and seeded determinism. `AlphaLab` applies it to the buyer–seller
+matching policy on a labelled benchmark and evaluates the winner on a held-out
+split.
+
+**Measured result** — `python benchmarks/evolve_alphas.py --buyers 120`, seed 7,
+60 individuals × 40 generations:
+
+| Metric (48 held-out buyers) | Legacy policy | Evolved policy | Delta |
+|-----------------------------|--------------:|---------------:|------:|
+| NDCG@5 | 0.7667 | **1.0000** | +0.2333 |
+| MRR | 0.4305 | **1.0000** | +0.5695 |
+| Spearman | 0.4339 | **1.0000** | +0.5661 |
+
+- 95% bootstrap CI on NDCG@5 improvement: **[+0.1952, +0.2773]**
+- Paired bootstrap **p < 0.0001**
+- Latent-weight recovery L1 error **0.0653**; train/test gap **0.0000**
+- 2,381 evaluations in 9.55 s; Pareto archive of 64 policies
+
+```python
+from acquisition_platform import AlphaLab, AlphaEvolver, EvolutionConfig, Objective, ParamSpec
+
+lab = AlphaLab(seed=7, population_size=60, generations=40)
+benchmark = lab.build_benchmark(n_buyers=120, seed=7)
+result = lab.evolve_matching_policy(benchmark)
+
+result.evolved_metrics["ndcg@5"]   # 1.0 on the held-out split
+result.weight_error_l1             # 0.0653
+```
+
+**Scope.** The benchmark's latent utility lies inside the policy family, so
+NDCG saturates at 1.0 by construction. This is a recoverability and
+generalisation result for the optimiser — not a market-alpha claim. Full
+methodology, limitations, and the mutation-testing evidence are in
+[docs/ALPHA_ENGINE.md](docs/ALPHA_ENGINE.md); the pipeline is rendered in
+[diagrams/alpha_evolution.mmd](diagrams/alpha_evolution.mmd).
 
 ---
 
@@ -372,56 +417,77 @@ graph TD
 
 ### Evolution Framework
 
+The evolution layer has two tiers. `EvolutionEngine` remains the simple
+one-gene/one-objective GA. `AlphaEvolver` is the production engine: NSGA-II
+selection, per-gene mutation with adaptive σ, constraint domination, a bounded
+Pareto archive, and full determinism under `EvolutionConfig.seed`.
+
 ```mermaid
 flowchart TD
     subgraph Input["Input"]
-        DATA[Research Data]
-        BENCH[Benchmarks]
-        PARAMS[Parameters]
+        DATA["Labelled benchmark"]
+        SPEC["ParamSpec search space"]
+        BASE["Baseline parameters"]
     end
 
-    subgraph Evolution["Evolution Engine"]
-        INIT[Initialize Population]
-        EVAL[Evaluate Fitness]
-        SELECT[Selection]
-        CROSS[Crossover]
-        MUTATE[Mutation]
-        REPLACEMENT[Replacement]
+    subgraph Evolution["AlphaEvolver (NSGA-II)"]
+        INIT["Seed population<br/>RNG + baseline"]
+        EVAL["Evaluate objectives"]
+        SORT["Fast non-dominated sort"]
+        CROWD["Crowding distance"]
+        SELECT["Tournament selection"]
+        CROSS["BLX-alpha crossover"]
+        MUTATE["Gaussian mutation<br/>adaptive sigma"]
+        MERGE["mu+lambda survival"]
+        ARCHIVE["Pareto archive"]
     end
 
-    subgraph Evaluation["Evaluation Framework"]
-        METRICS[Metrics Calculator]
-        COMPARISON[Comparison]
-        RANKING[Result Ranking]
-        VISUAL[Visualization]
+    subgraph Evaluation["Evaluation layer"]
+        METRICS["Ranking / classification /<br/>regression / calibration"]
+        STATS["Bootstrap CI<br/>paired p-value"]
+        GATE["Regression gate"]
     end
 
     subgraph Output["Output"]
-        BEST[Best Solution]
-        REPORT[Report]
-        DEPLOY[Deployment]
+        BEST["Best alpha + Pareto front"]
+        REPORT["EvolutionReport"]
+        ARTIFACT["alpha_report.json/.md"]
     end
 
-    Input --> Evolution
-    Evolution --> Evaluation
-    Evaluation --> Output
-
+    DATA --> INIT
+    SPEC --> INIT
+    BASE --> INIT
     INIT --> EVAL
-    EVAL --> SELECT
+    EVAL --> SORT
+    SORT --> CROWD
+    CROWD --> SELECT
     SELECT --> CROSS
     CROSS --> MUTATE
-    MUTATE --> REPLACEMENT
-    REPLACEMENT --> EVAL
-
-    METRICS --> COMPARISON
-    COMPARISON --> RANKING
-    RANKING --> VISUAL
+    MUTATE --> MERGE
+    MERGE --> SORT
+    SORT --> ARCHIVE
+    ARCHIVE --> EVAL
+    EVAL --> METRICS
+    METRICS --> STATS
+    STATS --> GATE
+    ARCHIVE --> BEST
+    MERGE --> REPORT
+    BEST --> ARTIFACT
+    GATE --> ARTIFACT
 
     style Input fill:#6e7681,stroke:#30363d,color:#fff
     style Evolution fill:#238636,stroke:#30363d,color:#fff
     style Evaluation fill:#1f6feb,stroke:#30363d,color:#fff
     style Output fill:#f85149,stroke:#30363d,color:#fff
 ```
+
+**Guarantees pinned by tests:** identical vectors for identical seeds; best
+fitness monotonic across generations (elitism); every Pareto-front member
+mutually non-dominated; archive never exceeds its cap; hard constraints hold in
+the returned best alpha.
+
+See [Alpha Evolution Engine](#alpha-evolution-engine) for measured results and
+[docs/ALPHA_ENGINE.md](docs/ALPHA_ENGINE.md) for methodology.
 
 ### Dual-Use Assessment Pipeline
 
@@ -654,21 +720,57 @@ results = ranker.rank("platform", listings, user_preferences={"category": "saas"
 
 #### `evolution.py` — Evolution Framework
 
-Genetic algorithm engine for hyperparameter optimization with benchmark evaluation.
+Two engines: the legacy scalar `EvolutionEngine`, and `AlphaEvolver` for
+multi-gene, multi-objective search with constraints.
 
 ```python
-from acquisition_platform import EvolutionEngine, Benchmark
+from acquisition_platform import (
+    AlphaEvolver, Constraint, EvolutionConfig, Objective, ParamSpec,
+)
 
-engine = EvolutionEngine(population_size=50, generations=20)
-result = engine.evolve(fitness_fn=lambda x: x**2, gene_range=(0, 100))
-# EvolutionResult(best_fitness=..., converged=True, ...)
-
-bench = Benchmark(name="matching_accuracy", target=0.90)
-eval_result = bench.evaluate(actual=0.92)
-# EvaluationResult(passed=True, gap=-0.02, suggestion="Maintain current performance")
+evolver = AlphaEvolver(
+    space=[ParamSpec("risk_aversion", 0.0, 1.0), ParamSpec("max_weight", 0.05, 0.4)],
+    objectives=[Objective("sharpe", target=1.0), Objective("turnover", maximize=False)],
+    constraints=[Constraint("concentration", lambda p: p["max_weight"] - 0.25)],
+    config=EvolutionConfig(population_size=64, generations=50, seed=11),
+)
+report = evolver.evolve(evaluate, baseline_params=current_config)
+# EvolutionReport(best=Alpha(...), pareto_front=[...], improvement_pct=..., seed=11)
 ```
 
-**GA Operators:** Tournament selection, uniform crossover, Gaussian mutation, elitism.
+**Operators:** fast non-dominated sort, crowding distance, binary tournament,
+BLX-α crossover, adaptive Gaussian mutation, μ+λ survival, bounded archive.
+
+#### `evaluation.py` — Metrics & Significance
+
+```python
+from acquisition_platform import classification_metrics, ndcg_at_k, bootstrap_ci
+
+classification_metrics([1, 0, 1], [1, 0, 0])   # precision, recall, F1, accuracy
+ndcg_at_k([3.0, 2.0, 1.0], 5)                   # 1.0
+bootstrap_ci([0.1, 0.2, 0.3], seed=7)           # Interval(low=..., high=..., confidence=0.95)
+```
+
+Covers classification, ranking (AUC, AP, MAP, NDCG), regression (MAE, RMSE, R²,
+Spearman), calibration (ECE), and inference (bootstrap CI, paired p-value,
+Cohen's d). No third-party dependencies.
+
+#### `alpha_lab.py` — Policy Evolution
+
+Builds a deterministic labelled matching benchmark, evolves `MatchingPolicy`
+weights against the training split, and reports held-out metrics, recovered
+weights, generalisation gap, CI, and p-value.
+
+#### `benchmark_suite.py` — Regression Gate
+
+```python
+from acquisition_platform import BenchmarkCase, BenchmarkSuite
+
+suite = BenchmarkSuite("core")
+suite.add(BenchmarkCase("matching_50x50", run_matching, target_ms=250.0))
+report = suite.run(repeats=3, warmup=1)
+regressions = report.compare_to_baseline(SuiteReport.load("benchmarks/baseline.json"))
+```
 
 ### Dual-Use Assessment Modules
 
@@ -1284,7 +1386,7 @@ pytest tests/test_benchmarks.py -v
 pytest tests/ --cov=acquisition_platform --cov-report=term-missing
 ```
 
-**Test Results:** 1018 tests passing, mypy clean, 0 failures.
+**Test Results:** 1302 tests passing, mypy clean, 0 failures.
 
 ---
 
@@ -1332,6 +1434,34 @@ flowchart TD
 ---
 
 ## Benchmarks
+
+### Measured: alpha evolution
+
+Reproduce with `python benchmarks/evolve_alphas.py --buyers 120`. Artifacts are
+written to `benchmarks/alpha_report.json` and `benchmarks/alpha_report.md`.
+
+| Metric (48 held-out buyers) | Legacy | Evolved | Delta |
+|-----------------------------|-------:|--------:|------:|
+| NDCG@5 | 0.7667 | 1.0000 | +0.2333 |
+| MRR | 0.4305 | 1.0000 | +0.5695 |
+| Spearman | 0.4339 | 1.0000 | +0.5661 |
+
+95% CI on the NDCG@5 delta **[+0.1952, +0.2773]**, paired bootstrap
+**p < 0.0001**, weight-recovery L1 **0.0653**, train/test gap **0.0000**.
+
+Latency (median of 3 runs): matching 50×50 **3.61 ms** (target 250 ms), NDCG over
+1,000 relevances **0.06 ms** (target 10 ms), evolution 20×10 **42.89 ms**
+(target 1,500 ms). All three cases pass; the suite fails CI on a >25% regression
+against `benchmarks/baseline.json`.
+
+**Scope.** The latent utility lies inside the policy family, so NDCG saturates
+at 1.0 by construction. This validates optimiser convergence and generalisation,
+not market alpha. See [docs/ALPHA_ENGINE.md](docs/ALPHA_ENGINE.md).
+
+### Design gates
+
+Per-module targets asserted by the test suite — pass/fail is produced by
+`pytest`, not by an external market benchmark.
 
 | Benchmark | Target | Current | Status |
 |-----------|--------|---------|--------|
@@ -1385,7 +1515,10 @@ acquisition-platform-research/
 │       ├── due_diligence.py         # Due diligence scheduling
 │       ├── dynamic_pricing.py       # Dynamic pricing (Stackelberg)
 │       ├── entity_resolution.py     # Entity resolution (O(n²))
-│       ├── evolution.py             # Evolution framework (GA)
+│       ├── evolution.py             # Evolution framework (GA + NSGA-II alpha engine)
+│       ├── evaluation.py            # Metrics, bootstrap CI, paired p-value
+│       ├── alpha_lab.py             # Policy evolution against labelled benchmark
+│       ├── benchmark_suite.py       # Latency suite with regression gate
 │       ├── exceptions.py            # Custom exceptions
 │       ├── export_control.py        # Export control (ITAR/EAR)
 │       ├── financial_modeling.py    # Defense financial modeling

@@ -1,0 +1,42 @@
+flowchart LR
+    subgraph Space["Search space"]
+        SPEC["ParamSpec x4<br/>gap / midpoint / size weights + bias<br/>bounds enforced per gene"]
+    end
+
+    subgraph Init["Initialisation"]
+        SEED["EvolutionConfig.seed<br/>reproducible RNG"] --> POP["Population (60)<br/>random + baseline seed"]
+        BASE["Legacy policy<br/>gap_weight=1, rest 0"] --> POP
+    end
+
+    subgraph Loop["Generation loop (40)"]
+        EVAL["Evaluate on TRAIN split<br/>objectives: NDCG@5, value"] --> SORT["Fast non-dominated sort<br/>O(MN^2)"]
+        SORT --> CROWD["Crowding distance<br/>per objective"]
+        CROWD --> TOUR["Binary tournament<br/>rank, then crowding"]
+        TOUR --> BLEND["BLX-alpha crossover<br/>per gene"]
+        BLEND --> MUT["Gaussian mutation<br/>adaptive sigma"]
+        MUT --> MERGE["mu+lambda merge<br/>elitism = 2"]
+        MERGE --> SORT
+    end
+
+    subgraph Archive["Pareto archive"]
+        PARETO["Non-dominated set<br/>cap = 64"]
+    end
+
+    subgraph Holdout["Hold-out evaluation (TEST split)"]
+        LEGACY["Legacy policy"] --> TEST["NDCG@5, MRR, Spearman"]
+        ALPHA["Selected alpha<br/>max train NDCG@5"] --> TEST
+        TEST --> STATS["Bootstrap 95% CI<br/>paired p-value"]
+    end
+
+    SPEC --> POP
+    POP --> EVAL
+    SORT --> PARETO
+    MERGE --> PARETO
+    PARETO --> ALPHA
+    LEGACY --> STATS
+
+    style Space fill:#6e7681,stroke:#30363d,color:#fff
+    style Init fill:#1f6feb,stroke:#30363d,color:#fff
+    style Loop fill:#238636,stroke:#30363d,color:#fff
+    style Archive fill:#8957e5,stroke:#30363d,color:#fff
+    style Holdout fill:#f85149,stroke:#30363d,color:#fff
