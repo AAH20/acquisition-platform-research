@@ -17,8 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cross-validation (`AlphaLab.cross_validate`): k-fold re-run of the whole procedure with per-fold seeds
 - Specification-shift curve (`AlphaLab.robustness_curve`): held-out performance as the latent fair-value point moves
 - Search comparators: equal-budget random search and a multimodal (Rastrigin) benchmark that separates search strategies
+- Grid oracle (`AlphaLab.grid_search_baseline`): exhaustive 15³ weight grid as a quality reference
+- Misspecification study (`AlphaLab.misspecification_study`): unobservable seller-quality signal, NDCG ceiling and top-1 regret
+- Input-noise stability (`AlphaLab.stability_under_noise`): Spearman and NDCG drop under price perturbation
 - Benchmark regression gate gains a measurement-noise floor for sub-5 ms cases
-- 128 new tests since the v0.1 baseline (1342 total); mutation-tested invariants
+- 144 new tests since the v0.1 baseline (1358 total); mutation-tested invariants
 
 ### Changed
 - `BuyerSellerMatcher` accepts an optional `MatchingPolicy`

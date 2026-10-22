@@ -18,6 +18,7 @@ number.
 from __future__ import annotations
 
 import hashlib
+import itertools
 import math
 import random
 import statistics
@@ -202,6 +203,52 @@ class CVReport:
         }
 
 
+@dataclass(frozen=True)
+class MisspecificationReport:
+    """Cost of a policy family that cannot observe part of the true utility."""
+
+    quality_weight: float
+    baseline_ndcg: float
+    evolved_ndcg: float
+    baseline_regret: float
+    evolved_regret: float
+    train_evolved_ndcg: float
+    generalization_gap: float
+
+    def to_dict(self) -> dict[str, float]:
+        """Return a JSON-serialisable representation."""
+        return {
+            "quality_weight": self.quality_weight,
+            "baseline_ndcg": self.baseline_ndcg,
+            "evolved_ndcg": self.evolved_ndcg,
+            "baseline_regret": self.baseline_regret,
+            "evolved_regret": self.evolved_regret,
+            "train_evolved_ndcg": self.train_evolved_ndcg,
+            "generalization_gap": self.generalization_gap,
+        }
+
+
+@dataclass(frozen=True)
+class StabilityReport:
+    """Ranking stability under input perturbation."""
+
+    sigma: float
+    trials: int
+    mean_spearman: float
+    min_spearman: float
+    mean_ndcg_drop: float
+
+    def to_dict(self) -> dict[str, float | int]:
+        """Return a JSON-serialisable representation."""
+        return {
+            "sigma": self.sigma,
+            "trials": self.trials,
+            "mean_spearman": self.mean_spearman,
+            "min_spearman": self.min_spearman,
+            "mean_ndcg_drop": self.mean_ndcg_drop,
+        }
+
+
 def _normalise_weights(weights: dict[str, float]) -> dict[str, float]:
     clipped = {name: max(0.0, weights.get(name, 0.0)) for name in WEIGHT_NAMES}
     total = sum(clipped.values())
@@ -285,6 +332,7 @@ class AlphaLab:
         sellers_per_buyer: int = 12,
         seed: int | None = None,
         midpoint_ratio: float = 0.5,
+        quality_weight: float = 0.0,
     ) -> MatchingBenchmark:
         """Build a deterministic matching benchmark.
 
@@ -300,6 +348,10 @@ class AlphaLab:
             midpoint_ratio: True fair-value point as a fraction of budget. The
                 default 0.5 matches the policy family; other values are used to
                 measure specification shift.
+            quality_weight: Weight of an unobservable seller-quality signal in
+                the latent utility. Zero (default) keeps the utility inside the
+                policy family; a positive value measures the cost of an
+                incomplete feature set.
 
         Returns:
             MatchingBenchmark with disjoint 60/40 train/test splits.
@@ -311,6 +363,10 @@ class AlphaLab:
         if not 0.0 < midpoint_ratio <= 1.0:
             raise InvalidRangeError(
                 f"midpoint_ratio must be in (0, 1], got {midpoint_ratio}"
+            )
+        if not 0.0 <= quality_weight <= 2.0:
+            raise InvalidRangeError(
+                f"quality_weight must be in [0, 2], got {quality_weight}"
             )
 
         generator = random.Random(self.seed if seed is None else seed)
@@ -331,13 +387,18 @@ class AlphaLab:
             for seller_index in range(sellers_per_buyer):
                 fraction = 0.05 + 0.90 * generator.betavariate(2.0, 2.0)
                 price = round(budget * fraction, 2)
+                seller_id = f"s{buyer_index:03d}_{seller_index:02d}"
+                quality = self._quality(seller_id)
                 seller = Seller(
-                    id=f"s{buyer_index:03d}_{seller_index:02d}",
+                    id=seller_id,
                     asking_price=price,
-                    attributes={"category": category},
+                    attributes={"category": category, "quality": quality},
                 )
                 sellers.append(seller)
-                utilities.append(self._utility(budget, price, midpoint_ratio))
+                utilities.append(
+                    self._utility(budget, price, midpoint_ratio)
+                    + quality_weight * quality
+                )
 
             low, high = min(utilities), max(utilities)
             span = high - low
@@ -360,6 +421,16 @@ class AlphaLab:
             true_weights=dict(DEFAULT_TRUE_WEIGHTS),
             seed=self.seed if seed is None else seed,
         )
+
+    @staticmethod
+    def _quality(seller_id: str) -> float:
+        """Deterministic quality signal derived from the seller id.
+
+        Uses a hash rather than the RNG so adding this signal does not shift the
+        price stream and silently change existing benchmarks.
+        """
+        digest = hashlib.sha256(seller_id.encode()).hexdigest()
+        return int(digest[:8], 16) / 0xFFFFFFFF
 
     @staticmethod
     def _utility(budget: float, price: float, midpoint_ratio: float = 0.5) -> float:
@@ -663,6 +734,195 @@ class AlphaLab:
             "test_ndcg@5": test_ndcg,
             "evaluations": budget,
         }
+
+
+    def misspecification_study(
+        self,
+        quality_weight: float = 0.6,
+        n_buyers: int = 120,
+        sellers_per_buyer: int = 12,
+        seed: int | None = None,
+    ) -> MisspecificationReport:
+        """Measure the cost of a policy that cannot see part of the truth.
+
+        The benchmark's latent utility includes a seller-quality signal that
+        ``MatchingPolicy`` cannot observe. Perfect ranking is therefore
+        impossible; the question is how much of the achievable gain survives and
+        how far the selected policy sits from the best candidate available.
+
+        Args:
+            quality_weight: Weight of the unobservable signal.
+            n_buyers: Buyers in the study benchmark.
+            sellers_per_buyer: Candidates per buyer.
+            seed: Optional run seed.
+
+        Returns:
+            MisspecificationReport with NDCG and top-1 utility regret.
+        """
+        benchmark = self.build_benchmark(
+            n_buyers=n_buyers,
+            sellers_per_buyer=sellers_per_buyer,
+            seed=self.seed if seed is None else seed,
+            quality_weight=quality_weight,
+        )
+        outcome = self.evolve_matching_policy(benchmark, seed=seed)
+        policy = MatchingPolicy.from_params(outcome.selected_alpha.params)
+        baseline = MatchingPolicy()
+
+        def regret(active: MatchingPolicy) -> float:
+            total = 0.0
+            for case in benchmark.test.cases:
+                scored = [
+                    (active.score(case.buyer, seller), relevance)
+                    for seller, relevance in zip(case.sellers, case.relevance)
+                ]
+                top_relevance = max(scored)[1]
+                total += 1.0 - top_relevance
+            return total / len(benchmark.test.cases)
+
+        return MisspecificationReport(
+            quality_weight=quality_weight,
+            baseline_ndcg=outcome.baseline_metrics["ndcg@5"],
+            evolved_ndcg=outcome.evolved_metrics["ndcg@5"],
+            baseline_regret=regret(baseline),
+            evolved_regret=regret(policy),
+            train_evolved_ndcg=outcome.train_metrics["ndcg@5"],
+            generalization_gap=outcome.generalization_gap,
+        )
+
+    def grid_search_baseline(
+        self,
+        benchmark: MatchingBenchmark,
+        steps: int = 15,
+        seed: int | None = None,
+    ) -> dict[str, object]:
+        """Exhaustively grid the weight simplex and keep the best training policy.
+
+        This is an oracle-style comparator: if the evolver cannot match a dense
+        grid on the same space, its search is leaving quality on the table.
+
+        Args:
+            benchmark: Benchmark to search against.
+            steps: Points per weight axis; evaluations = steps³ − 1.
+            seed: Unused; present for API symmetry.
+
+        Returns:
+            Best parameters plus train/test NDCG@5 and evaluation count.
+        """
+        if steps < 2:
+            raise InvalidRangeError("steps must be at least 2")
+        grid = [index / (steps - 1) for index in range(steps)]
+        best_train = -1.0
+        best_params: dict[str, float] = {
+            "gap_weight": 1.0,
+            "midpoint_weight": 0.0,
+            "size_weight": 0.0,
+            "bias": 0.0,
+        }
+        evaluations = 0
+        for gap, midpoint, size in itertools.product(grid, repeat=3):
+            if gap == 0.0 and midpoint == 0.0 and size == 0.0:
+                continue
+            candidate = {
+                "gap_weight": gap,
+                "midpoint_weight": midpoint,
+                "size_weight": size,
+                "bias": 0.0,
+            }
+            evaluations += 1
+            train_ndcg = _metrics(
+                MatchingPolicy.from_params(candidate), benchmark.train
+            )["ndcg@5"]
+            if train_ndcg > best_train:
+                best_train = train_ndcg
+                best_params = candidate
+        test_ndcg = _metrics(
+            MatchingPolicy.from_params(best_params), benchmark.test
+        )["ndcg@5"]
+        return {
+            "params": best_params,
+            "train_ndcg@5": best_train,
+            "test_ndcg@5": test_ndcg,
+            "evaluations": evaluations,
+        }
+
+    def stability_under_noise(
+        self,
+        params: dict[str, float],
+        sigma: float = 0.05,
+        trials: int = 5,
+        seed: int | None = None,
+    ) -> StabilityReport:
+        """Measure how much the ranking moves when asking prices are perturbed.
+
+        Args:
+            params: Policy parameters to test.
+            sigma: Relative price noise, uniform in [-sigma, sigma].
+            trials: Independent perturbation rounds.
+            seed: Noise seed.
+
+        Returns:
+            StabilityReport with mean/min Spearman correlation against the
+            unperturbed ranking and the mean NDCG drop.
+        """
+        if not 0.0 <= sigma < 1.0:
+            raise InvalidRangeError(f"sigma must be in [0, 1), got {sigma}")
+        if trials < 1:
+            raise InvalidRangeError("trials must be at least 1")
+
+        benchmark = self.build_benchmark(
+            n_buyers=60, sellers_per_buyer=12, seed=self.seed
+        )
+        policy = MatchingPolicy.from_params(params)
+        generator = random.Random(self.seed if seed is None else seed)
+        trial_taus: list[float] = []
+        trial_drops: list[float] = []
+
+        for _ in range(trials):
+            taus: list[float] = []
+            drops: list[float] = []
+            for case in benchmark.test.cases:
+                base_scores = [
+                    policy.score(case.buyer, seller) for seller in case.sellers
+                ]
+                perturbed = [
+                    Seller(
+                        id=seller.id,
+                        asking_price=seller.asking_price
+                        * (1.0 + generator.uniform(-sigma, sigma)),
+                        attributes=dict(seller.attributes),
+                    )
+                    for seller in case.sellers
+                ]
+                noisy_scores = [
+                    policy.score(case.buyer, seller) for seller in perturbed
+                ]
+                taus.append(spearman_correlation(base_scores, noisy_scores))
+                base_ranking = [
+                    relevance
+                    for _, relevance in sorted(
+                        zip(base_scores, case.relevance), reverse=True
+                    )
+                ]
+                noisy_ranking = [
+                    relevance
+                    for _, relevance in sorted(
+                        zip(noisy_scores, case.relevance), reverse=True
+                    )
+                ]
+                drops.append(
+                    ndcg_at_k(base_ranking, 5) - ndcg_at_k(noisy_ranking, 5)
+                )
+            trial_taus.append(statistics.fmean(taus))
+            trial_drops.append(statistics.fmean(drops))
+
+        return StabilityReport(
+            sigma=sigma,
+            trials=trials,
+            mean_spearman=statistics.fmean(trial_taus),
+            min_spearman=min(trial_taus),
+            mean_ndcg_drop=statistics.fmean(trial_drops),
+        )
 
 
 def run_alpha_lab(

@@ -1264,7 +1264,7 @@
       0.02234352203811969
     ],
     "seed": 7,
-    "elapsed_seconds": 9.839444067998556
+    "elapsed_seconds": 10.19315735399141
   },
   "selected_alpha": {
     "alpha_id": "a000-0056",
@@ -1332,7 +1332,7 @@
     "train_cases": 72,
     "test_cases": 48,
     "benchmark_fingerprint": "e7423ecd20acbb85",
-    "wall_seconds": 9.882
+    "wall_seconds": 10.235
   },
   "cross_validation": {
     "n_splits": 5,
@@ -1442,7 +1442,34 @@
     "random_best": -25.335196198476652,
     "evolutionary_evals": 497,
     "random_evals": 2381,
-    "wall_seconds": 0.1880928460159339
+    "wall_seconds": 0.20803891000105068
+  },
+  "misspecification": {
+    "quality_weight": 0.6,
+    "baseline_ndcg": 0.6273035964315816,
+    "evolved_ndcg": 0.6785665897717431,
+    "baseline_regret": 0.4488888055878808,
+    "evolved_regret": 0.15150493703781423,
+    "train_evolved_ndcg": 0.7196089298837288,
+    "generalization_gap": 0.04104234011198571
+  },
+  "grid_search": {
+    "params": {
+      "gap_weight": 0.14285714285714285,
+      "midpoint_weight": 0.35714285714285715,
+      "size_weight": 0.0,
+      "bias": 0.0
+    },
+    "train_ndcg@5": 1.0,
+    "test_ndcg@5": 1.0,
+    "evaluations": 3374
+  },
+  "stability": {
+    "sigma": 0.05,
+    "trials": 5,
+    "mean_spearman": 0.9708041958041959,
+    "min_spearman": 0.9624125874125874,
+    "mean_ndcg_drop": 0.0032385367682903387
   },
   "registry": {
     "alpha_id": "matching-policy-s7",
@@ -1464,26 +1491,26 @@
     "results": [
       {
         "name": "matching_50x50",
-        "value": 2.6022550009656698,
+        "value": 2.6356489979662,
         "target": 250.0,
         "passed": true,
-        "duration_ms": 2.6022550009656698,
+        "duration_ms": 2.6356489979662,
         "unit": "ms"
       },
       {
         "name": "ndcg_1000",
-        "value": 0.05472099292092025,
+        "value": 0.06145599763840437,
         "target": 10.0,
         "passed": true,
-        "duration_ms": 0.05472099292092025,
+        "duration_ms": 0.06145599763840437,
         "unit": "ms"
       },
       {
         "name": "evolution_20x10",
-        "value": 37.5830740085803,
+        "value": 38.60517599969171,
         "target": 1500.0,
         "passed": true,
-        "duration_ms": 37.5830740085803,
+        "duration_ms": 38.60517599969171,
         "unit": "ms"
       }
     ]

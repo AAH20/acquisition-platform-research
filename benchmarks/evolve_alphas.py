@@ -211,6 +211,54 @@ def write_markdown(path: Path, payload: dict[str, Any], suite: SuiteReport) -> N
             "",
         ]
 
+    grid = payload.get("grid_search")
+    if grid:
+        lines += [
+            "## Grid oracle",
+            "",
+            "| Search | Evaluations | Test NDCG@5 |",
+            "|--------|------------:|------------:|",
+            f"| Grid ({round(grid['evaluations'] ** (1 / 3))}³ points) | "
+            f"{grid['evaluations']} | {grid['test_ndcg@5']:.4f} |",
+            f"| Evolution | {report['evaluations']} "
+            f"| {float(evolved['ndcg@5']):.4f} |",
+            "",
+        ]
+
+    misspecification = payload.get("misspecification")
+    if misspecification:
+        lines += [
+            "## Misspecification: unobservable seller quality",
+            "",
+            "The latent utility includes a quality signal the policy cannot see.",
+            "",
+            "| Metric | Legacy | Evolved |",
+            "|--------|-------:|--------:|",
+            f"| NDCG@5 | {misspecification['baseline_ndcg']:.4f} | "
+            f"{misspecification['evolved_ndcg']:.4f} |",
+            f"| Top-1 utility regret | {misspecification['baseline_regret']:.4f} | "
+            f"{misspecification['evolved_regret']:.4f} |",
+            "",
+            f"Training NDCG reaches {misspecification['train_evolved_ndcg']:.4f} "
+            f"(gap {misspecification['generalization_gap']:.4f}). With roughly a "
+            "third of the utility unobservable, the policy cannot approach the "
+            "ceiling — but it still removes most of the legacy regret.",
+            "",
+        ]
+
+    stability = payload.get("stability")
+    if stability:
+        lines += [
+            "## Stability under price noise",
+            "",
+            f"±{stability['sigma'] * 100:.0f}% uniform price perturbation over "
+            f"{stability['trials']} trials: mean Spearman "
+            f"**{stability['mean_spearman']:.4f}**, worst trial "
+            f"**{stability['min_spearman']:.4f}**, mean NDCG drop "
+            f"**{stability['mean_ndcg_drop']:.4f}**.",
+            "",
+        ]
+
     registry = payload.get("registry")
     if registry:
         decision = registry["decision"]
@@ -309,6 +357,20 @@ def main() -> int:
         budget=max(600, result.report.evaluations), seed=args.seed, dimensions=5
     )
     payload["search_comparison"] = search_comparison.to_dict()
+
+    # cost of an unobservable signal, oracle comparison, and input-noise stability
+    misspecification = lab.misspecification_study(
+        quality_weight=0.6, n_buyers=args.buyers, seed=args.seed
+    )
+    payload["misspecification"] = misspecification.to_dict()
+
+    grid = lab.grid_search_baseline(benchmark, steps=15)
+    payload["grid_search"] = grid
+
+    stability = lab.stability_under_noise(
+        result.selected_alpha.params, sigma=0.05, trials=5, seed=args.seed
+    )
+    payload["stability"] = stability.to_dict()
 
     # register the evaluated alpha and attempt one promotion
     card = EvaluationCard.create(

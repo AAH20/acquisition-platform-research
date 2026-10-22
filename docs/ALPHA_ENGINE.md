@@ -193,6 +193,49 @@ separate search strategies — a negative result about the benchmark, reported
 rather than hidden. On a multimodal objective the evolver reaches the global
 optimum with roughly one fifth of random search's evaluations.
 
+### Grid oracle
+
+A dense grid over the three weights (15³ − 1 = 3,374 evaluated policies) is the
+practical oracle for this space:
+
+| Search | Evaluations | Test NDCG@5 |
+|--------|------------:|------------:|
+| Grid (15³ points) | 3,374 | 1.0000 |
+| Evolution | 2,381 | 1.0000 |
+
+The evolver matches the grid while evaluating 29% fewer policies. Since both
+saturate, this is an efficiency result, not a quality one.
+
+### Misspecification: an unobservable signal
+
+The policy sees price and budget only. The study benchmark adds a
+seller-quality signal to the latent utility (`quality_weight = 0.6`), which the
+policy cannot observe — roughly a third of the decision-relevant variance.
+
+| Metric | Legacy | Evolved |
+|--------|-------:|--------:|
+| NDCG@5 | 0.6273 | 0.6786 |
+| Top-1 utility regret | 0.4489 | 0.1515 |
+
+Training NDCG reaches 0.7196; the train/test gap is 0.0410. The policy **cannot
+approach the ceiling** — that is the point — but it removes 66% of the legacy
+regret with the information it has. The honest reading: the in-family gain of
++0.2333 is an upper bound; with a third of the utility unobservable, the
+realisable gain is +0.051 NDCG.
+
+### Input-noise stability
+
+Ranking under ±5% uniform price perturbation, five trials:
+
+| Metric | Value |
+|--------|------:|
+| Mean Spearman vs unperturbed | 0.9708 |
+| Worst trial | 0.9624 |
+| Mean NDCG drop | 0.0032 |
+
+The policy is stable to small pricing errors, which matters because quoted
+prices are noisy in practice.
+
 ---
 
 ## 6. Interpretation and limits
@@ -211,7 +254,15 @@ cannot tell you what those weights are.
 **Search attribution.** Because random search ties on this policy, the
 matching-policy experiment says nothing about evolutionary search efficiency.
 The Rastrigin comparison is the evidence for that claim, and it is scoped to
-multimodal objectives.
+multimodal objectives. The grid oracle adds a second, narrower result: on this
+space the evolver matches exhaustive search with 29% fewer evaluations.
+
+**Misspecification is the binding constraint, not optimisation.** When a third
+of the utility is unobservable, the realisable NDCG gain falls from +0.2333 to
+**+0.051**, even though the optimiser still removes 66% of legacy regret. Any
+deployment claim should be scaled by that ratio, and the first engineering
+priority is adding the missing signal — seller quality, buyer intent, or
+conversion history — not tuning the search.
 
 **Specification sensitivity (measured).** The evolved policy dominates the
 legacy heuristic at every shift except 0.40, where it trails by 0.016. Upward
@@ -310,6 +361,7 @@ objectives, declare constraints, write a deterministic evaluator, evolve.
 python -m pytest tests/test_evaluation.py tests/test_alpha_evolution.py \
                  tests/test_matching_policy.py tests/test_alpha_lab.py \
                  tests/test_alpha_robustness.py tests/test_alpha_registry.py \
+                 tests/test_alpha_misspecification.py \
                  tests/test_benchmark_suite.py -v
 python benchmarks/evolve_alphas.py --buyers 120
 ```

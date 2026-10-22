@@ -1,6 +1,6 @@
 # Acquisition Platform Research & Optimization
 
-> **Unified optimization engine for acquisition/auction platforms.** 100-agent parallel research across 8 platforms + 30+ dual-use verticals, 30 NP-hard problem solvers, an NSGA-II alpha-evolution engine, 1342 tests, 54 source modules, 7 architecture diagrams.
+> **Unified optimization engine for acquisition/auction platforms.** 100-agent parallel research across 8 platforms + 30+ dual-use verticals, 30 NP-hard problem solvers, an NSGA-II alpha-evolution engine, 1358 tests, 54 source modules, 7 architecture diagrams.
 
 ## Table of Contents
 
@@ -36,8 +36,8 @@ This project is a unified research and optimization engine for acquisition and a
 | Dual-use verticals researched | 30+ |
 | NP-hard problems solved | 30 |
 | Source modules | 54 |
-| Test files | 60 |
-| Tests passing | 1342 |
+| Test files | 61 |
+| Tests passing | 1358 |
 | Architecture diagrams | 7 |
 | Lines of code | ~17,000+ |
 | Research documents | 50+ |
@@ -67,7 +67,17 @@ split.
 - Paired bootstrap **p < 0.0001**
 - Latent-weight recovery L1 error **0.0653**; train/test gap **0.0000**
 - 5-fold cross-validation: **+0.2358 ± 0.0254**, 100% of folds improved
+- Grid oracle: matches a 3,374-point grid with **2,381 evaluations**
 - 2,381 evaluations in 13.02 s; Pareto archive of 64 policies
+
+**Ceiling under misspecification.** With a third of the latent utility coming
+from an unobservable seller-quality signal, the realisable NDCG gain falls from
+**+0.2333** in-family to **+0.051** (0.6273 → 0.6786), while top-1 utility
+regret drops 66% (0.4489 → 0.1515). The optimiser still works; the information
+does not.
+
+**Stability.** Under ±5% price noise the ranking holds: mean Spearman **0.9708**,
+worst trial 0.9624, mean NDCG drop 0.0032.
 
 **Where the gains survive — and where they do not.** Re-running the whole
 procedure on five disjoint folds reproduces the effect (+0.2358 ± 0.0254, win

@@ -1,6 +1,6 @@
 # Alpha Report — Evolved Matching Policy
 
-Seed **7**, population **2381 evaluations** across **40 generations** in 9.84s.
+Seed **7**, population **2381 evaluations** across **40 generations** in 10.19s.
 
 ## Hold-out performance
 
@@ -63,6 +63,28 @@ The policy landscape is smooth and four-dimensional, so random sampling also rea
 
 Rastrigin's global optimum is 0.0. The evolver reaches it with roughly a fifth of random search's evaluation budget.
 
+## Grid oracle
+
+| Search | Evaluations | Test NDCG@5 |
+|--------|------------:|------------:|
+| Grid (15³ points) | 3374 | 1.0000 |
+| Evolution | 2381 | 1.0000 |
+
+## Misspecification: unobservable seller quality
+
+The latent utility includes a quality signal the policy cannot see.
+
+| Metric | Legacy | Evolved |
+|--------|-------:|--------:|
+| NDCG@5 | 0.6273 | 0.6786 |
+| Top-1 utility regret | 0.4489 | 0.1515 |
+
+Training NDCG reaches 0.7196 (gap 0.0410). With roughly a third of the utility unobservable, the policy cannot approach the ceiling — but it still removes most of the legacy regret.
+
+## Stability under price noise
+
+±5% uniform price perturbation over 5 trials: mean Spearman **0.9708**, worst trial **0.9624**, mean NDCG drop **0.0032**.
+
 ## Promotion gate
 
 Alpha `matching-policy-s7` is at stage **canary**; promotion accepted: **False** (alpha already registered (idempotent run)); hash chain verified: **True**.
@@ -77,8 +99,8 @@ Alpha `matching-policy-s7` is at stage **canary**; promotion accepted: **False**
 
 | Case | Median ms | Target ms | Pass |
 |------|----------:|----------:|:----:|
-| matching_50x50 | 2.60 | 250.00 | yes |
-| ndcg_1000 | 0.05 | 10.00 | yes |
-| evolution_20x10 | 37.58 | 1500.00 | yes |
+| matching_50x50 | 2.64 | 250.00 | yes |
+| ndcg_1000 | 0.06 | 10.00 | yes |
+| evolution_20x10 | 38.61 | 1500.00 | yes |
 
 Suite score: **3/3** cases inside target.
