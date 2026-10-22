@@ -278,6 +278,30 @@ that, so the result is not an artefact of an underpowered test. Equally, the
 detectable difference", not as a loss. Reporting the MDE is what makes that
 distinction possible.
 
+### Generalisation to a second domain
+
+Every result above comes from one problem. A reusable-substrate claim needs a
+second, structurally different one: an analytic mean-variance market with no
+sampling noise, where the optimum is computable.
+
+The policy sees expected return, volatility and sector momentum — never the
+covariance matrix. The oracle sees everything.
+
+| Policy | Sharpe | Volatility | Diversification |
+|--------|-------:|-----------:|----------------:|
+| Equal weight | 0.1013 | 0.1061 | 0.875 |
+| Inverse volatility | 0.1408 | 0.0980 | 0.867 |
+| Evolved | 0.4077 | 0.0981 | 0.707 |
+| Analytic oracle | 0.4131 | 0.0988 | 0.700 |
+
+The evolver reaches **98.7%** of the analytic optimum in 915 evaluations —
+**4.0×** the equal-weight Sharpe and **2.9×** inverse-volatility — with a
+64-policy Pareto front and hypervolume 0.3843.
+
+The engine, objectives, constraint machinery and hypervolume are unchanged;
+only the genome and the evaluator differ. That is the substrate claim, measured
+rather than asserted.
+
 ---
 
 ## 6. Interpretation and limits
@@ -327,6 +351,13 @@ the 0.40 point into a null. With an MDE of 0.0318 the study can detect effects a
 third the size of the measured +0.2358, so the positive result is well powered
 and the 0.40 null is a genuine "no detectable difference" rather than noise
 masquerading as a reversal. Report the MDE with every null.
+
+**Generality is one domain, twice.** The portfolio result transfers the
+machinery — same evolver, objectives, constraints, hypervolume — to a different
+problem class and reaches 98.7% of a computable optimum. It does not transfer
+the matching insight, and the second domain is analytic and three-parameter, so
+there is no sampling noise to defeat. A third domain with sampled observations
+is the next honest test before claiming universal applicability.
 
 ---
 

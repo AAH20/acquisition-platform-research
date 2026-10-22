@@ -121,6 +121,17 @@ class EvaluationCard:
         )
 
 
+def _age_days(created_at: str, now: datetime | None = None) -> float:
+    """Age of an ISO-8601 timestamp in days, never negative."""
+    created = datetime.fromisoformat(created_at)
+    if created.tzinfo is None:
+        created = created.replace(tzinfo=timezone.utc)
+    reference = now or datetime.now(timezone.utc)
+    if reference.tzinfo is None:
+        reference = reference.replace(tzinfo=timezone.utc)
+    return max(0.0, (reference - created).total_seconds() / 86400.0)
+
+
 @dataclass(frozen=True)
 class PromotionGate:
     """Thresholds an alpha must clear to advance a stage."""
@@ -129,8 +140,17 @@ class PromotionGate:
     min_delta: float = 0.05
     max_p_value: float = 0.05
     max_generalization_gap: float = 0.10
+    max_age_days: float | None = None
 
-    def failures(self, card: EvaluationCard) -> list[str]:
+    def __post_init__(self) -> None:
+        if self.max_age_days is not None and self.max_age_days <= 0:
+            raise InvalidRangeError(
+                f"max_age_days must be positive, got {self.max_age_days}"
+            )
+
+    def failures(
+        self, card: EvaluationCard, now: datetime | None = None
+    ) -> list[str]:
         """Return one human-readable reason per failed gate."""
         reasons: list[str] = []
         ndcg = float(card.metrics.get("ndcg@5", 0.0))
@@ -149,6 +169,13 @@ class PromotionGate:
                 f"generalization gap {gap:.4f} above maximum "
                 f"{self.max_generalization_gap:.4f}"
             )
+        if self.max_age_days is not None:
+            age = _age_days(card.created_at, now)
+            if age > self.max_age_days:
+                reasons.append(
+                    f"evidence is stale: {age:.1f} days old, maximum "
+                    f"{self.max_age_days:.1f}"
+                )
         return reasons
 
 
@@ -324,6 +351,23 @@ class AlphaRegistry:
             raise ValidationError(f"alpha '{alpha_id}' is not registered")
         return history[-1].stage
 
+    def age_days(self, alpha_id: str, now: datetime | None = None) -> float:
+        """Age of an alpha's evaluation card in days."""
+        return _age_days(self.get(alpha_id).created_at, now)
+
+    def is_stale(
+        self,
+        alpha_id: str,
+        max_age_days: float,
+        now: datetime | None = None,
+    ) -> bool:
+        """Whether an alpha's evidence is older than ``max_age_days``."""
+        if max_age_days <= 0:
+            raise InvalidRangeError(
+                f"max_age_days must be positive, got {max_age_days}"
+            )
+        return self.age_days(alpha_id, now) > max_age_days
+
     def latest(self, stage: str | None = None) -> EvaluationCard | None:
         """Return the most recently registered card, optionally filtered by stage."""
         candidates: list[tuple[int, EvaluationCard]] = []
@@ -352,7 +396,10 @@ class AlphaRegistry:
         return card.alpha_id
 
     def promote(
-        self, alpha_id: str, gate: PromotionGate | None = None
+        self,
+        alpha_id: str,
+        gate: PromotionGate | None = None,
+        now: datetime | None = None,
     ) -> PromotionDecision:
         """Attempt to advance an alpha to the next stage."""
         active_gate = gate or PromotionGate()
@@ -372,7 +419,7 @@ class AlphaRegistry:
                 reasons=("alpha has been rolled back and cannot be promoted",),
             )
 
-        failures = active_gate.failures(card)
+        failures = active_gate.failures(card, now=now)
         if failures:
             return PromotionDecision(
                 promoted=False, stage=stage, reasons=tuple(failures)

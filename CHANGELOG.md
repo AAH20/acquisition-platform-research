@@ -22,8 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Input-noise stability (`AlphaLab.stability_under_noise`): Spearman and NDCG drop under price perturbation
 - Walk-forward (`AlphaLab.build_temporal_benchmark`, `AlphaLab.walk_forward`): drifting cohorts, frozen vs rolling refit, mean-rank ensemble comparator
 - Statistical validity: `holm_bonferroni` multiple-comparison control, `minimum_detectable_effect` power analysis, `hypervolume_2d` for two-objective fronts; shift points now carry paired bootstrap p-values
+- `alpha_portfolio.py`: second-domain proof — analytic market, capped-simplex policy, projected-gradient oracle; the shared evolver reaches 98.7% of the analytic optimum
+- Registry ageing: `PromotionGate.max_age_days`, `AlphaRegistry.age_days` / `is_stale`, and `promote(now=...)` so stale evidence cannot advance
 - Benchmark regression gate gains a measurement-noise floor for sub-5 ms cases
-- 175 new tests since the v0.1 baseline (1389 total); mutation-tested invariants
+- 202 new tests since the v0.1 baseline (1416 total); mutation-tested invariants
 
 ### Changed
 - `BuyerSellerMatcher` accepts an optional `MatchingPolicy`

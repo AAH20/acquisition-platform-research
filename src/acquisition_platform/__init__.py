@@ -74,6 +74,15 @@ from acquisition_platform.alpha_lab import (
     WalkForwardReport,
     WalkForwardStep,
 )
+from acquisition_platform.alpha_portfolio import (
+    Allocation,
+    Market,
+    PortfolioLab,
+    PortfolioReport,
+    max_sharpe_allocation,
+    policy_weights,
+    portfolio_stats,
+)
 from acquisition_platform.alpha_registry import (
     AlphaRegistry,
     EvaluationCard,
@@ -83,6 +92,7 @@ from acquisition_platform.alpha_registry import (
 )
 
 __all__ = [
+    "Allocation",
     "Alpha",
     "AlphaEvolver",
     "AlphaLab",
@@ -115,12 +125,15 @@ __all__ = [
     "Match",
     "MatchingBenchmark",
     "MatchingPolicy",
+    "Market",
     "MisspecificationReport",
     "Objective",
     "ParamSpec",
     "PolicyEvolution",
     "Portfolio",
+    "PortfolioLab",
     "PortfolioOptimizer",
+    "PortfolioReport",
     "PriceRecommendation",
     "PricingEngine",
     "PromotionDecision",
@@ -148,10 +161,13 @@ __all__ = [
     "holm_bonferroni",
     "hypervolume_2d",
     "mae",
+    "max_sharpe_allocation",
     "mean_average_precision",
     "minimum_detectable_effect",
     "ndcg_at_k",
     "paired_bootstrap_pvalue",
+    "policy_weights",
+    "portfolio_stats",
     "r2",
     "rmse",
     "roc_auc",

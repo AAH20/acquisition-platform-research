@@ -1,6 +1,6 @@
 # Alpha Report — Evolved Matching Policy
 
-Seed **7**, population **2381 evaluations** across **40 generations** in 9.26s.
+Seed **7**, population **2381 evaluations** across **40 generations** in 9.09s.
 
 ## Hold-out performance
 
@@ -105,6 +105,21 @@ front does **not** add lift here — front members are highly
 correlated and slightly overfit — so the single alpha remains the
 default.
 
+## Second domain: portfolio allocation
+
+The same `AlphaEvolver`, objectives and hypervolume applied to a
+3-parameter allocation policy on an analytic 8-asset market. The
+policy never sees the covariance matrix; the oracle does.
+
+| Policy | Sharpe | Volatility | Diversification |
+|--------|-------:|-----------:|----------------:|
+| Equal weight | 0.1013 | 0.1061 | 0.875 |
+| Inverse volatility | 0.1408 | 0.0980 | 0.867 |
+| Evolved | 0.4077 | 0.0981 | 0.707 |
+| Analytic oracle | 0.4131 | 0.0988 | 0.700 |
+
+Evolved Sharpe reaches **98.7%** of the analytic optimum in 915 evaluations, and the Pareto front holds 64 policies.
+
 ## Promotion gate
 
 Alpha `matching-policy-s7` is at stage **canary**; promotion accepted: **False** (alpha already registered (idempotent run)); hash chain verified: **True**.
@@ -119,8 +134,8 @@ Alpha `matching-policy-s7` is at stage **canary**; promotion accepted: **False**
 
 | Case | Median ms | Target ms | Pass |
 |------|----------:|----------:|:----:|
-| matching_50x50 | 2.48 | 250.00 | yes |
-| ndcg_1000 | 0.06 | 10.00 | yes |
-| evolution_20x10 | 38.73 | 1500.00 | yes |
+| matching_50x50 | 2.64 | 250.00 | yes |
+| ndcg_1000 | 0.05 | 10.00 | yes |
+| evolution_20x10 | 37.34 | 1500.00 | yes |
 
 Suite score: **3/3** cases inside target.

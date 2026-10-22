@@ -29,6 +29,7 @@ from acquisition_platform.alpha_lab import (  # noqa: E402
     AlphaLab,
     compare_search_strategies,
 )
+from acquisition_platform.alpha_portfolio import PortfolioLab  # noqa: E402
 from acquisition_platform.evaluation import (  # noqa: E402
     holm_bonferroni,
     minimum_detectable_effect,
@@ -315,6 +316,37 @@ def write_markdown(path: Path, payload: dict[str, Any], suite: SuiteReport) -> N
             "",
         ]
 
+    portfolio = payload.get("portfolio_domain")
+    if portfolio:
+        lines += [
+            "## Second domain: portfolio allocation",
+            "",
+            "The same `AlphaEvolver`, objectives and hypervolume applied to a",
+            "3-parameter allocation policy on an analytic 8-asset market. The",
+            "policy never sees the covariance matrix; the oracle does.",
+            "",
+            "| Policy | Sharpe | Volatility | Diversification |",
+            "|--------|-------:|-----------:|----------------:|",
+        ]
+        for key, label in (
+            ("equal_weight", "Equal weight"),
+            ("inverse_volatility", "Inverse volatility"),
+            ("evolved", "Evolved"),
+            ("oracle", "Analytic oracle"),
+        ):
+            entry = portfolio[key]
+            lines.append(
+                f"| {label} | {entry['sharpe']:.4f} | {entry['volatility']:.4f} | "
+                f"{entry['diversification']:.3f} |"
+            )
+        lines += [
+            "",
+            f"Evolved Sharpe reaches **{portfolio['share_of_oracle']:.1%}** of the "
+            f"analytic optimum in {portfolio['evaluations']} evaluations, and the "
+            f"Pareto front holds {portfolio['pareto_size']} policies.",
+            "",
+        ]
+
     registry = payload.get("registry")
     if registry:
         decision = registry["decision"]
@@ -452,6 +484,15 @@ def main() -> int:
     )
     walk = walk_lab.walk_forward(temporal)
     payload["walk_forward"] = walk.to_dict()
+
+    # second domain: the same evolver on a portfolio allocation policy
+    portfolio_lab = PortfolioLab(
+        seed=args.seed, population_size=40, generations=25
+    )
+    portfolio_market = portfolio_lab.build_market(
+        n_assets=8, n_sectors=3, seed=args.seed
+    )
+    payload["portfolio_domain"] = portfolio_lab.evolve(portfolio_market).to_dict()
 
     # register the evaluated alpha and attempt one promotion
     card = EvaluationCard.create(
