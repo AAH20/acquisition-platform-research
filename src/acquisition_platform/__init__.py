@@ -69,10 +69,21 @@ from acquisition_platform.alpha_lab import (
     PolicyEvolution,
     RobustnessPoint,
     SearchComparison,
+    SeedSensitivityReport,
+    SeedTrial,
     StabilityReport,
     TemporalBenchmark,
     WalkForwardReport,
     WalkForwardStep,
+)
+from acquisition_platform.alpha_auction import (
+    AuctionLab,
+    AuctionMarket,
+    AuctionReport,
+    BidOutcome,
+    equilibrium_params,
+    grid_search,
+    truthful_params,
 )
 from acquisition_platform.alpha_portfolio import (
     Allocation,
@@ -98,6 +109,10 @@ __all__ = [
     "AlphaLab",
     "AlphaRegistry",
     "Asset",
+    "AuctionLab",
+    "AuctionMarket",
+    "AuctionReport",
+    "BidOutcome",
     "Benchmark",
     "BenchmarkCase",
     "BenchmarkSuite",
@@ -145,6 +160,8 @@ __all__ = [
     "RobustnessPoint",
     "SearchComparison",
     "SearchRanker",
+    "SeedSensitivityReport",
+    "SeedTrial",
     "Seller",
     "StabilityReport",
     "SuiteReport",
@@ -157,7 +174,9 @@ __all__ = [
     "bootstrap_ci",
     "classification_metrics",
     "cohens_d",
+    "equilibrium_params",
     "expected_calibration_error",
+    "grid_search",
     "holm_bonferroni",
     "hypervolume_2d",
     "mae",
@@ -172,6 +191,7 @@ __all__ = [
     "rmse",
     "roc_auc",
     "spearman_correlation",
+    "truthful_params",
 ]
 
 __version__ = "0.2.0"

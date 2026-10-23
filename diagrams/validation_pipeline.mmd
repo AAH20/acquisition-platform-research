@@ -1,0 +1,66 @@
+flowchart TD
+    SEED(("seed 7<br/>fingerprint e7423ecd"))
+
+    subgraph Build["Benchmark construction"]
+        BENCH["120 buyers x 12 sellers<br/>latent utility over 3 weights"]
+        SPLIT["Split 72 train / 48 held-out"]
+    end
+
+    subgraph Search["NSGA-II search"]
+        EVOLVE["AlphaEvolver<br/>60 individuals x 40 generations"]
+        ARCH[("Pareto archive<br/>64 policies")]
+    end
+
+    subgraph Eval["Hold-out evaluation"]
+        HOLDOUT["NDCG@5, MRR, Spearman<br/>avg price ratio"]
+        STATS["Bootstrap 95% CI<br/>paired p-value"]
+    end
+
+    subgraph Stress["Stress studies"]
+        SHIFT["Specification shift<br/>6 midpoints, Holm"]
+        MISS["Misspecification<br/>unobservable quality"]
+        NOISE["Price noise<br/>plus/minus 5 percent, 5 trials"]
+        WF["Walk-forward<br/>3 drift steps"]
+        XDOM["Second domain<br/>8-asset allocation"]
+    end
+
+    subgraph Gate["Promotion gate"]
+        GATE{"all gates pass?"}
+        PROMO["Promote to canary"]
+        HOLD["Refuse, name failed gates"]
+    end
+
+    subgraph Artifacts["Evidence artifacts"]
+        REG[("alpha_registry.json<br/>hash-chained log")]
+        REPORT["alpha_report.json and .md"]
+    end
+
+    SEED --> BENCH
+    BENCH --> SPLIT
+    SPLIT --> EVOLVE
+    EVOLVE --> ARCH
+    EVOLVE --> HOLDOUT
+    HOLDOUT --> STATS
+    STATS --> SHIFT
+    STATS --> MISS
+    STATS --> NOISE
+    STATS --> WF
+    EVOLVE --> XDOM
+    SHIFT --> GATE
+    MISS --> GATE
+    NOISE --> GATE
+    WF --> GATE
+    XDOM --> GATE
+    GATE -->|yes| PROMO
+    GATE -->|no| HOLD
+    PROMO --> REG
+    HOLD --> REG
+    STATS --> REPORT
+    REG --> REPORT
+
+    style Build fill:#1f6feb,stroke:#30363d,color:#fff
+    style Search fill:#238636,stroke:#30363d,color:#fff
+    style Eval fill:#8b5cff,stroke:#30363d,color:#fff
+    style Stress fill:#d29922,stroke:#30363d,color:#fff
+    style Gate fill:#f85149,stroke:#30363d,color:#fff
+    style Artifacts fill:#6e7681,stroke:#30363d,color:#fff

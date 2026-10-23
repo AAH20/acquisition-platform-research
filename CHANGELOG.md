@@ -23,9 +23,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Walk-forward (`AlphaLab.build_temporal_benchmark`, `AlphaLab.walk_forward`): drifting cohorts, frozen vs rolling refit, mean-rank ensemble comparator
 - Statistical validity: `holm_bonferroni` multiple-comparison control, `minimum_detectable_effect` power analysis, `hypervolume_2d` for two-objective fronts; shift points now carry paired bootstrap p-values
 - `alpha_portfolio.py`: second-domain proof — analytic market, capped-simplex policy, projected-gradient oracle; the shared evolver reaches 98.7% of the analytic optimum
+- `alpha_auction.py`: third-domain proof — first-price bid shading on a sampled objective; 95.96% of the closed-form equilibrium, and the highest-fitness alpha is shown to lose money
+- `AlphaLab.seed_sensitivity`: six seeds on a fixed benchmark; gain reproducible (+0.2333 ± 0.0000) while weight vectors vary by up to 0.3688 L1
+- Fixed: `evolve_matching_policy` crashed on 7.5% of seeds (all-zero weight vertex); the search now scores a degenerate genome as unfit instead of raising
+- `docs/VALIDATION.md` + `diagrams/validation_pipeline.mmd`: 53-row evidence ledger tracing every published figure to an artifact, with 10 weak/unsupported claims flagged
 - Registry ageing: `PromotionGate.max_age_days`, `AlphaRegistry.age_days` / `is_stale`, and `promote(now=...)` so stale evidence cannot advance
 - Benchmark regression gate gains a measurement-noise floor for sub-5 ms cases
-- 202 new tests since the v0.1 baseline (1416 total); mutation-tested invariants
+- 285 new tests since the v0.1 baseline (1499 total); mutation-tested invariants
 
 ### Changed
 - `BuyerSellerMatcher` accepts an optional `MatchingPolicy`

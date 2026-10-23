@@ -1,6 +1,6 @@
 # Acquisition Platform Research & Optimization
 
-> **Unified optimization engine for acquisition/auction platforms.** 100-agent parallel research across 8 platforms + 30+ dual-use verticals, 30 NP-hard problem solvers, an NSGA-II alpha-evolution engine validated on two domains, 1416 tests, 55 source modules, 7 architecture diagrams.
+> **Unified optimization engine for acquisition/auction platforms.** 100-agent parallel research across 8 platforms + 30+ dual-use verticals, 30 NP-hard problem solvers, an NSGA-II alpha-evolution engine validated on three domains, 1499 tests, 56 source modules, 8 architecture diagrams.
 
 ## Table of Contents
 
@@ -17,6 +17,7 @@
 - [Testing](#testing)
 - [Evolution Framework](#evolution-framework)
 - [Benchmarks](#benchmarks)
+- [Validation Ledger](docs/VALIDATION.md)
 - [Project Structure](#project-structure)
 - [Contributing](#contributing)
 - [License](#license)
@@ -35,10 +36,10 @@ This project is a unified research and optimization engine for acquisition and a
 | Platforms analyzed | 8 |
 | Dual-use verticals researched | 30+ |
 | NP-hard problems solved | 30 |
-| Source modules | 55 |
-| Test files | 65 |
-| Tests passing | 1416 |
-| Architecture diagrams | 7 |
+| Source modules | 56 |
+| Test files | 68 |
+| Tests passing | 1499 |
+| Architecture diagrams | 8 |
 | Lines of code | ~17,000+ |
 | Research documents | 50+ |
 | Alpha-evolution NDCG@5 | 0.7667 → 1.0000 (held-out) |
@@ -68,7 +69,7 @@ split.
 - Latent-weight recovery L1 error **0.0653**; train/test gap **0.0000**
 - 5-fold cross-validation: **+0.2358 ± 0.0254**, 100% of folds improved
 - Grid oracle: matches a 3,374-point grid with **2,381 evaluations**
-- 2,381 evaluations in 13.02 s; Pareto archive of 64 policies
+- 2,381 evaluations in 10.0 s; Pareto archive of 64 policies
 
 **Ceiling under misspecification.** With a third of the latent utility coming
 from an unobservable seller-quality signal, the realisable NDCG gain falls from
@@ -79,11 +80,11 @@ does not.
 **Stability.** Under ±5% price noise the ranking holds: mean Spearman **0.9708**,
 worst trial 0.9624, mean NDCG drop 0.0032.
 
-**Drift.** Across four cohorts whose fair-value midpoint moves 0.425 → 0.575, a
-frozen policy decays 0.9831 → 0.8094 while per-period refitting holds 0.9765 →
-0.9471 (mean **+0.0638**, widening to **+0.1377** by the third period). Mean-rank
-ensembling of the Pareto front adds no lift (−0.0040), so the control that
-matters is refit cadence, not aggregation.
+**Drift.** Across four cohorts (three scored transitions) whose fair-value midpoint
+moves 0.425 → 0.575, a frozen policy decays 0.9831 → 0.8094 while per-period
+refitting holds 0.9765 → 0.9471 (mean **+0.0638**, widening to **+0.1377** by the
+third period). Mean-rank ensembling of the Pareto front adds no lift (−0.0040),
+so the control that matters is refit cadence, not aggregation.
 
 **Statistical validity.** Six specification-shift comparisons are corrected with
 Holm–Bonferroni at α = 0.05: five survive (p < 0.0001) and the 0.40 point does
@@ -97,6 +98,19 @@ analytic 8-asset allocation problem: evolved Sharpe **0.4077** against
 equal-weight 0.1013 and an analytic oracle of 0.4131 — **98.7% of the optimum**
 in 915 evaluations, using a policy that never sees the covariance matrix.
 
+**Third domain — noise.** A first-price auction bid-shading policy scored on
+finite samples (300 auctions per evaluation), where a closed-form equilibrium
+supplies the optimum: evolved profit **0.04798** vs **0.04926** equilibrium
+(**95.96%**, 633 evaluations). The highest-scalar-fitness alpha **loses money**
+(−0.03194) because the scalarised objective buys win rate with overbidding —
+evidence that two objectives plus one fitness number is not a decision rule.
+
+**Seed sensitivity.** Six search seeds on one fixed benchmark: gain
+**+0.2333 ± 0.0000**, seed-luck ratio **0.0000**, worst seed still **+0.2333**.
+The *gain* is not luck; the *weights* are not identified — policies up to
+**0.3688** L1 apart score identically, so "recovered ranking" is the defensible
+claim, not "recovered weights".
+
 **Where the gains survive — and where they do not.** Re-running the whole
 procedure on five disjoint folds reproduces the effect (+0.2358 ± 0.0254, win
 rate 100%). Under specification shift the evolved policy beats the legacy
@@ -109,10 +123,12 @@ random search spends 2,381 and stalls at −25.34. Both results are reported in
 
 **Governance.** `AlphaRegistry` is an append-only, hash-chained event log with
 shadow → canary → production stages and promotion gates. The measured alpha
-passes every gate and is promoted to canary with the chain verified; a tamper
-test rewrites a stored metric and confirms `verify()` returns `False`.
-Walk-forward results are the evidence a promotion should require, and the
-drift curve is why a production alpha needs a maximum age.
+passes every gate on its first promotion and advances to canary with the chain
+verified; repeating the attempt is idempotently refused (the stored decision
+reads `promoted: false`, the history shows the advance). A tamper test rewrites
+a stored metric and confirms `verify()` returns `False`. Walk-forward results
+are the evidence a promotion should require, and the drift curve is why a
+production alpha needs a maximum age — now enforced by `max_age_days`.
 
 ```python
 from acquisition_platform import AlphaLab, AlphaEvolver, EvolutionConfig, Objective, ParamSpec
@@ -1442,7 +1458,7 @@ pytest tests/test_benchmarks.py -v
 pytest tests/ --cov=acquisition_platform --cov-report=term-missing
 ```
 
-**Test Results:** 1302 tests passing, mypy clean, 0 failures.
+**Test Results:** 1499 tests passing, mypy clean, 0 failures.
 
 ---
 
@@ -1503,12 +1519,14 @@ written to `benchmarks/alpha_report.json` and `benchmarks/alpha_report.md`.
 | Spearman | 0.4339 | 1.0000 | +0.5661 |
 
 95% CI on the NDCG@5 delta **[+0.1952, +0.2773]**, paired bootstrap
-**p < 0.0001**, weight-recovery L1 **0.0653**, train/test gap **0.0000**.
+**p < 0.0001**, weight-recovery L1 **0.0653** on this run (cross-seed weight
+spread is **0.3688** — see seed sensitivity), train/test gap **0.0000**.
 
-Latency (median of 3 runs): matching 50×50 **3.61 ms** (target 250 ms), NDCG over
-1,000 relevances **0.06 ms** (target 10 ms), evolution 20×10 **42.89 ms**
+Latency (regenerated artifact): matching 50×50 **2.61 ms** (target 250 ms), NDCG
+over 1,000 relevances **0.054 ms** (target 10 ms), evolution 20×10 **44.43 ms**
 (target 1,500 ms). All three cases pass; the suite fails CI on a >25% regression
-against `benchmarks/baseline.json`.
+**and** a >2 ms absolute increase against `benchmarks/baseline.json`, so
+sub-5 ms scheduler jitter cannot trip it.
 
 **Scope.** The latent utility lies inside the policy family, so NDCG saturates
 at 1.0 by construction. This validates optimiser convergence and generalisation,
@@ -1516,8 +1534,11 @@ not market alpha. See [docs/ALPHA_ENGINE.md](docs/ALPHA_ENGINE.md).
 
 ### Design gates
 
-Per-module targets asserted by the test suite — pass/fail is produced by
-`pytest`, not by an external market benchmark.
+Illustrative per-module acceptance targets from the design phase. These are
+**targets, not measurements**: no artifact records the "Current" column, and
+`docs/VALIDATION.md` lists this table among the weak claims. The figures in this
+README that are artifact-backed are the alpha-engine results above and in
+`benchmarks/alpha_report.md`; treat the table below as a specification of intent.
 
 | Benchmark | Target | Current | Status |
 |-----------|--------|---------|--------|

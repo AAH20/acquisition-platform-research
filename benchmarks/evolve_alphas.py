@@ -29,6 +29,10 @@ from acquisition_platform.alpha_lab import (  # noqa: E402
     AlphaLab,
     compare_search_strategies,
 )
+from acquisition_platform.alpha_auction import (  # noqa: E402
+    AuctionLab,
+    AuctionMarket,
+)
 from acquisition_platform.alpha_portfolio import PortfolioLab  # noqa: E402
 from acquisition_platform.evaluation import (  # noqa: E402
     holm_bonferroni,
@@ -347,6 +351,68 @@ def write_markdown(path: Path, payload: dict[str, Any], suite: SuiteReport) -> N
             "",
         ]
 
+    seeds = payload.get("seed_sensitivity")
+    if seeds:
+        lines += [
+            "## Seed sensitivity",
+            "",
+            f"{seeds['n_seeds']} search seeds on one fixed benchmark. The data,",
+            "the baseline and the ground truth are identical, so all spread is",
+            "optimiser noise.",
+            "",
+            "| Metric | Value |",
+            "|--------|------:|",
+            f"| Mean evolved NDCG@5 | {seeds['mean_evolved_ndcg']:.4f} ± "
+            f"{seeds['std_evolved_ndcg']:.4f} |",
+            f"| Mean gain | {seeds['mean_delta']:+.4f} ± {seeds['std_delta']:.4f} |",
+            f"| Worst-seed gain | {seeds['min_delta']:+.4f} |",
+            f"| Seed-luck ratio (sd / mean) | {seeds['seed_luck_ratio']:.4f} |",
+            f"| Win rate vs baseline | {seeds['win_rate']:.0%} |",
+            f"| Max weight deviation (L1) | {seeds['max_param_deviation']:.4f} |",
+            "",
+            "The gain is reproducible; the **weights are not identified**. Policies",
+            "up to the stated L1 distance score the same, so \"recovered weights\"",
+            "is a weaker claim than \"recovered ranking\".",
+            "",
+        ]
+
+    auction = payload.get("auction_domain")
+    if auction:
+        lines += [
+            "## Third domain: first-price auction (sampled objective)",
+            "",
+            "A bid-shading policy scored on finite simulated auction samples, so",
+            "the evolver sees a noisy objective. The closed-form equilibrium gives",
+            "a known optimum.",
+            "",
+            "| Policy | Profit/auction | Win rate | Share of closed form |",
+            "|--------|---------------:|---------:|---------------------:|",
+        ]
+        for key, label in (
+            ("truthful", "Truthful bidding"),
+            ("equilibrium", "Equilibrium"),
+            ("evolved", "Evolved"),
+            ("grid_oracle", "Grid oracle"),
+            ("scalar_best", "Highest scalar fitness"),
+        ):
+            entry = auction[key]
+            closed_form = 1.0 / (
+                auction["n_bidders"] * (auction["n_bidders"] + 1)
+            )
+            lines.append(
+                f"| {label} | {entry['profit']:.5f} | {entry['win_rate']:.4f} | "
+                f"{entry['profit'] / closed_form:.4f} |"
+            )
+        lines += [
+            "",
+            f"The evolver reaches **{auction['share_of_equilibrium']:.2%}** "
+            f"of the closed-form optimum in {auction['evaluations']} evaluations.",
+            "The highest-scalar-fitness alpha is a **money-loser**: maximising",
+            "`(profit + win_rate) / 2` buys win rate with overbidding. A deployment",
+            "choice has to be made explicitly from the Pareto front.",
+            "",
+        ]
+
     registry = payload.get("registry")
     if registry:
         decision = registry["decision"]
@@ -493,6 +559,20 @@ def main() -> int:
         n_assets=8, n_sectors=3, seed=args.seed
     )
     payload["portfolio_domain"] = portfolio_lab.evolve(portfolio_market).to_dict()
+
+    # seed sensitivity: how much of the gain is search-seed luck?
+    sensitivity_lab = AlphaLab(
+        seed=args.seed, population_size=24, generations=12
+    )
+    payload["seed_sensitivity"] = sensitivity_lab.seed_sensitivity(
+        seeds=tuple(range(1, 7)), n_buyers=args.buyers
+    ).to_dict()
+
+    # third domain: first-price auction with a sampled objective
+    auction_lab = AuctionLab(seed=args.seed)
+    payload["auction_domain"] = auction_lab.run(
+        AuctionMarket(n_bidders=4)
+    ).to_dict()
 
     # register the evaluated alpha and attempt one promotion
     card = EvaluationCard.create(

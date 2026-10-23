@@ -1,6 +1,6 @@
 # Alpha Report — Evolved Matching Policy
 
-Seed **7**, population **2381 evaluations** across **40 generations** in 9.09s.
+Seed **7**, population **2381 evaluations** across **40 generations** in 9.95s.
 
 ## Hold-out performance
 
@@ -120,6 +120,44 @@ policy never sees the covariance matrix; the oracle does.
 
 Evolved Sharpe reaches **98.7%** of the analytic optimum in 915 evaluations, and the Pareto front holds 64 policies.
 
+## Seed sensitivity
+
+6 search seeds on one fixed benchmark. The data,
+the baseline and the ground truth are identical, so all spread is
+optimiser noise.
+
+| Metric | Value |
+|--------|------:|
+| Mean evolved NDCG@5 | 1.0000 ± 0.0000 |
+| Mean gain | +0.2333 ± 0.0000 |
+| Worst-seed gain | +0.2333 |
+| Seed-luck ratio (sd / mean) | 0.0000 |
+| Win rate vs baseline | 100% |
+| Max weight deviation (L1) | 0.3688 |
+
+The gain is reproducible; the **weights are not identified**. Policies
+up to the stated L1 distance score the same, so "recovered weights"
+is a weaker claim than "recovered ranking".
+
+## Third domain: first-price auction (sampled objective)
+
+A bid-shading policy scored on finite simulated auction samples, so
+the evolver sees a noisy objective. The closed-form equilibrium gives
+a known optimum.
+
+| Policy | Profit/auction | Win rate | Share of closed form |
+|--------|---------------:|---------:|---------------------:|
+| Truthful bidding | 0.00000 | 0.4378 | 0.0000 |
+| Equilibrium | 0.04926 | 0.2452 | 0.9851 |
+| Evolved | 0.04798 | 0.2233 | 0.9596 |
+| Grid oracle | 0.04931 | 0.2535 | 0.9862 |
+| Highest scalar fitness | -0.03194 | 0.5770 | -0.6388 |
+
+The evolver reaches **95.96%** of the closed-form optimum in 633 evaluations.
+The highest-scalar-fitness alpha is a **money-loser**: maximising
+`(profit + win_rate) / 2` buys win rate with overbidding. A deployment
+choice has to be made explicitly from the Pareto front.
+
 ## Promotion gate
 
 Alpha `matching-policy-s7` is at stage **canary**; promotion accepted: **False** (alpha already registered (idempotent run)); hash chain verified: **True**.
@@ -134,8 +172,8 @@ Alpha `matching-policy-s7` is at stage **canary**; promotion accepted: **False**
 
 | Case | Median ms | Target ms | Pass |
 |------|----------:|----------:|:----:|
-| matching_50x50 | 2.64 | 250.00 | yes |
+| matching_50x50 | 2.61 | 250.00 | yes |
 | ndcg_1000 | 0.05 | 10.00 | yes |
-| evolution_20x10 | 37.34 | 1500.00 | yes |
+| evolution_20x10 | 44.43 | 1500.00 | yes |
 
 Suite score: **3/3** cases inside target.

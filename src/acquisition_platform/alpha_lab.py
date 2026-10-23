@@ -46,6 +46,8 @@ from acquisition_platform.matching import Buyer, Seller, MatchingPolicy
 
 WEIGHT_NAMES: tuple[str, str, str] = ("gap_weight", "midpoint_weight", "size_weight")
 
+DEGENERATE_POLICY_MESSAGE = "at least one policy weight must be positive"
+
 DEFAULT_TRUE_WEIGHTS: dict[str, float] = {
     "gap_weight": 0.35,
     "midpoint_weight": 0.50,
@@ -313,6 +315,112 @@ class WalkForwardReport:
         }
 
 
+@dataclass(frozen=True)
+class SeedTrial:
+    """One evolution run on a fixed benchmark under a distinct search seed.
+
+    The benchmark is identical across trials, so any difference between them is
+    attributable to the search's random stream rather than to the data.
+    """
+
+    seed: int
+    baseline_ndcg: float
+    evolved_ndcg: float
+    delta: float
+    recovered_weights: dict[str, float]
+    weight_error_l1: float
+
+    def to_dict(self) -> dict[str, object]:
+        """Return a JSON-serialisable representation."""
+        return {
+            "seed": self.seed,
+            "baseline_ndcg": self.baseline_ndcg,
+            "evolved_ndcg": self.evolved_ndcg,
+            "delta": self.delta,
+            "recovered_weights": dict(self.recovered_weights),
+            "weight_error_l1": self.weight_error_l1,
+        }
+
+
+@dataclass(frozen=True)
+class SeedSensitivityReport:
+    """How much of the measured alpha gain is search-seed luck.
+
+    The benchmark is built once and every trial reuses it, so ``baseline_ndcg``
+    is a constant and the spread in ``delta`` is pure optimiser noise.
+
+    Read it as follows:
+
+    - ``seed_luck_ratio`` is noise over signal: ``std_delta / mean_delta``. A
+      value of 1.0 means the seed-to-seed swing is as large as the average
+      gain, so the headline number is close to a coin flip. Values well below
+      1.0 mean the gain is reproducible across streams. If the mean gain is not
+      positive the ratio is undefined and reported as ``math.inf``.
+    - ``unlucky_gain`` is the one-standard-deviation haircut:
+      ``mean_delta - std_delta`` — the gain to expect on a mediocre seed.
+    - ``min_delta`` and ``gain_survives_worst_seed`` answer the blunter
+      question directly: does the worst search seed still beat the baseline?
+    - ``max_param_deviation`` is the widest L1 departure of a seed's recovered
+      weights from their cross-seed mean, i.e. how differently the runs
+      parameterise the policy while scoring the same.
+
+    Some seeds can be unusable if an evaluation raises for a reason other than
+    the search-space guard. That guard scores an all-zero weight vector as unfit
+    instead of propagating ``ValidationError``, so in normal operation
+    ``unusable_seeds`` is empty; a non-empty list is a signal to investigate,
+    not an expected outcome. Excluded seeds are listed rather than silently
+    dropped, and fewer than two usable seeds raises. ``n_seeds`` counts the
+    seeds actually measured; compare it with ``len(requested_seeds)`` before
+    quoting a result.
+    """
+
+    requested_seeds: tuple[int, ...]
+    unusable_seeds: tuple[int, ...]
+    n_seeds: int
+    benchmark_fingerprint: str
+    trials: tuple[SeedTrial, ...]
+    baseline_ndcg: float
+    quality_weight: float
+    mean_evolved_ndcg: float
+    std_evolved_ndcg: float
+    mean_delta: float
+    std_delta: float
+    min_delta: float
+    max_delta: float
+    win_rate: float
+    gain_ci: Interval
+    seed_luck_ratio: float
+    unlucky_gain: float
+    gain_survives_worst_seed: bool
+    max_param_deviation: float
+    p_value: float
+
+    def to_dict(self) -> dict[str, object]:
+        """Return a JSON-serialisable representation."""
+        return {
+            "requested_seeds": list(self.requested_seeds),
+            "unusable_seeds": list(self.unusable_seeds),
+            "n_seeds": self.n_seeds,
+            "benchmark_fingerprint": self.benchmark_fingerprint,
+            "trials": [trial.to_dict() for trial in self.trials],
+            "baseline_ndcg": self.baseline_ndcg,
+            "quality_weight": self.quality_weight,
+            "mean_evolved_ndcg": self.mean_evolved_ndcg,
+            "std_evolved_ndcg": self.std_evolved_ndcg,
+            "mean_delta": self.mean_delta,
+            "std_delta": self.std_delta,
+            "min_delta": self.min_delta,
+            "max_delta": self.max_delta,
+            "win_rate": self.win_rate,
+            "gain_ci": self.gain_ci.to_dict(),
+            "seed_luck_ratio": self.seed_luck_ratio,
+            "unlucky_gain": self.unlucky_gain,
+            "gain_survives_worst_seed": self.gain_survives_worst_seed,
+            "max_param_deviation": self.max_param_deviation,
+            "p_value": self.p_value,
+        }
+
+
 def _normalise_weights(weights: dict[str, float]) -> dict[str, float]:
     clipped = {name: max(0.0, weights.get(name, 0.0)) for name in WEIGHT_NAMES}
     total = sum(clipped.values())
@@ -369,6 +477,23 @@ def _metrics(policy: MatchingPolicy, split: MatchingSplit) -> dict[str, float]:
         "spearman": sum(correlations) / count,
         "avg_price_ratio": sum(price_ratios) / count,
     }
+
+
+def _policy_objectives(
+    params: dict[str, float], split: MatchingSplit
+) -> dict[str, float]:
+    """Score one genome, treating an invalid policy as unfit rather than fatal.
+
+    The evolver samples the closed box, so the all-zero weight vertex is
+    reachable. ``MatchingPolicy`` correctly refuses it, but a search must not
+    propagate that refusal: the genotype is simply the worst candidate.
+    """
+    try:
+        policy = MatchingPolicy.from_params(params)
+    except ValidationError:
+        return {"ndcg@5": 0.0, "value": 0.0}
+    metrics = _metrics(policy, split)
+    return {"ndcg@5": metrics["ndcg@5"], "value": 1.0 - metrics["avg_price_ratio"]}
 
 
 def _case_ndcg(policy: MatchingPolicy, split: MatchingSplit) -> list[float]:
@@ -584,12 +709,7 @@ class AlphaLab:
         ]
 
         def evaluate(params: dict[str, float]) -> dict[str, float]:
-            policy = MatchingPolicy.from_params(params)
-            metrics = _metrics(policy, benchmark.train)
-            return {
-                "ndcg@5": metrics["ndcg@5"],
-                "value": 1.0 - metrics["avg_price_ratio"],
-            }
+            return _policy_objectives(params, benchmark.train)
 
         evolver = AlphaEvolver(
             space,
@@ -793,6 +913,150 @@ class AlphaLab:
                 [f.baseline_ndcg for f in folds],
                 n_resamples=1000,
                 seed=self.seed,
+            ),
+        )
+
+    def seed_sensitivity(
+        self,
+        seeds: Sequence[int],
+        n_buyers: int = 72,
+        sellers_per_buyer: int = 12,
+        benchmark_seed: int | None = None,
+        quality_weight: float = 0.0,
+        n_resamples: int = 1000,
+    ) -> SeedSensitivityReport:
+        """Re-run the evolution under several search seeds on one benchmark.
+
+        The question this answers is how much of the reported improvement is
+        seed luck. The benchmark is built once and never regenerated, so the
+        data, the baseline and the ground truth are identical in every trial;
+        the only thing that changes is the optimiser's random stream. Any
+        spread in the gain is therefore attributable to the search.
+
+        Seeds must be distinct: a repeated seed would silently re-measure the
+        same run and understate the dispersion.
+
+        Args:
+            seeds: Distinct search seeds, at least two.
+            n_buyers: Total buyers in the shared benchmark.
+            sellers_per_buyer: Candidate sellers per buyer.
+            benchmark_seed: Data seed; defaults to the lab seed.
+            quality_weight: Weight of the unobservable seller-quality signal.
+                Zero (default) keeps the utility inside the policy family,
+                where the search saturates at NDCG@5 = 1.0 and the measured
+                gain has almost no seed variance. A positive value is the
+                regime where the search cannot reach the ceiling, so seed
+                sensitivity of the gain is actually observable.
+            n_resamples: Bootstrap resamples for the gain interval.
+
+        Returns:
+            SeedSensitivityReport with per-seed trials, the mean and spread of
+            the gain, the noise-to-signal ratio, the unlucky-seed haircut and
+            the widest parameter departure across seeds.
+
+        Raises:
+            ValidationError: If ``seeds`` is empty, or if fewer than two
+                requested seeds yield a usable policy. Seeds whose search
+                proposes a degenerate all-zero policy are listed in
+                ``unusable_seeds`` rather than silently dropped; any other
+                failure propagates unchanged.
+            InvalidRangeError: If ``seeds`` has fewer than two entries or
+                contains duplicates.
+        """
+        seed_list = list(seeds)
+        if not seed_list:
+            raise ValidationError("seeds cannot be empty")
+        if len(seed_list) < 2:
+            raise InvalidRangeError("seeds must contain at least two values")
+        if len(set(seed_list)) != len(seed_list):
+            raise InvalidRangeError("seeds must be distinct")
+
+        data_seed = self.seed if benchmark_seed is None else benchmark_seed
+        benchmark = self.build_benchmark(
+            n_buyers=n_buyers,
+            sellers_per_buyer=sellers_per_buyer,
+            seed=data_seed,
+            quality_weight=quality_weight,
+        )
+
+        trials: list[SeedTrial] = []
+        unusable: list[int] = []
+        for search_seed in seed_list:
+            try:
+                outcome = self.evolve_matching_policy(benchmark, seed=search_seed)
+            except (ValidationError, InvalidRangeError) as exc:
+                # On a boundary draw the evolver can clamp every weight to zero,
+                # and MatchingPolicy rejects that degenerate vector. The seed is
+                # recorded as unusable rather than silently dropped, and only
+                # this specific failure is absorbed: anything else is a real bug
+                # and must surface.
+                if DEGENERATE_POLICY_MESSAGE not in str(exc):
+                    raise
+                unusable.append(search_seed)
+                continue
+            baseline_ndcg = outcome.baseline_metrics["ndcg@5"]
+            evolved_ndcg = outcome.evolved_metrics["ndcg@5"]
+            trials.append(
+                SeedTrial(
+                    seed=search_seed,
+                    baseline_ndcg=baseline_ndcg,
+                    evolved_ndcg=evolved_ndcg,
+                    delta=evolved_ndcg - baseline_ndcg,
+                    recovered_weights=dict(outcome.recovered_weights),
+                    weight_error_l1=outcome.weight_error_l1,
+                )
+            )
+
+        if len(trials) < 2:
+            raise ValidationError(
+                f"only {len(trials)} of {len(seed_list)} seeds produced a usable "
+                f"policy; unusable seeds: {unusable}"
+            )
+
+        deltas = [trial.delta for trial in trials]
+        evolved = [trial.evolved_ndcg for trial in trials]
+        baselines = [trial.baseline_ndcg for trial in trials]
+        mean_delta = statistics.fmean(deltas)
+        std_delta = statistics.pstdev(deltas)
+
+        centre = {
+            name: statistics.fmean(
+                trial.recovered_weights[name] for trial in trials
+            )
+            for name in WEIGHT_NAMES
+        }
+        deviations = [
+            sum(
+                abs(trial.recovered_weights[name] - centre[name])
+                for name in WEIGHT_NAMES
+            )
+            for trial in trials
+        ]
+
+        return SeedSensitivityReport(
+            requested_seeds=tuple(seed_list),
+            unusable_seeds=tuple(unusable),
+            n_seeds=len(trials),
+            benchmark_fingerprint=benchmark.fingerprint(),
+            trials=tuple(trials),
+            baseline_ndcg=statistics.fmean(baselines),
+            quality_weight=quality_weight,
+            mean_evolved_ndcg=statistics.fmean(evolved),
+            std_evolved_ndcg=statistics.pstdev(evolved),
+            mean_delta=mean_delta,
+            std_delta=std_delta,
+            min_delta=min(deltas),
+            max_delta=max(deltas),
+            win_rate=sum(1 for delta in deltas if delta > 0.0) / len(deltas),
+            gain_ci=bootstrap_ci(
+                deltas, n_resamples=n_resamples, seed=data_seed
+            ),
+            seed_luck_ratio=std_delta / mean_delta if mean_delta > 0.0 else math.inf,
+            unlucky_gain=mean_delta - std_delta,
+            gain_survives_worst_seed=min(deltas) > 0.0,
+            max_param_deviation=max(deviations),
+            p_value=paired_bootstrap_pvalue(
+                evolved, baselines, n_resamples=n_resamples, seed=data_seed
             ),
         )
 

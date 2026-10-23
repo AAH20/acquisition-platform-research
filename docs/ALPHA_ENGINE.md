@@ -302,6 +302,36 @@ The engine, objectives, constraint machinery and hypervolume are unchanged;
 only the genome and the evaluator differ. That is the substrate claim, measured
 rather than asserted.
 
+### Third domain: a sampled objective
+
+The first two domains hand the optimiser an objective it can compute exactly.
+Real bidding does not. Here the bid-shading policy is scored on 300 simulated
+auctions per evaluation, so the ranking the search sees is noisy — and the
+closed-form equilibrium supplies a known optimum to measure against.
+
+| Policy | Profit/auction | Win rate | Share of closed form |
+|--------|---------------:|---------:|---------------------:|
+| Truthful bidding | 0.00000 | 0.4378 | 0.0000 |
+| Equilibrium | 0.04926 | 0.2452 | 0.9851 |
+| Evolved | 0.04798 | 0.2233 | 0.9596 |
+| Grid oracle | 0.04931 | 0.2535 | 0.9862 |
+| Highest scalar fitness | −0.03194 | 0.5770 | −0.6388 |
+
+The evolver reaches **95.96%** of the closed-form optimum in 633 evaluations —
+a shortfall that is statistically detectable (paired t = −2.26), not seed luck.
+The highest-scalar-fitness alpha **loses money**: `(profit + win_rate) / 2`
+pays for win rate with overbidding. Two objectives plus one scalar fitness is
+not a decision rule; the deployment candidate has to be chosen explicitly from
+the front (here, max profit on a held-out validation transcript).
+
+### Seed identification
+
+Six search seeds on one fixed benchmark: gain **+0.2333 ± 0.0000**, worst seed
+**+0.2333**, seed-luck ratio **0.0000**. The gain is reproducible. The
+parameters are not: policies up to **0.3688** L1 apart score identically, so
+"the evolver recovered the weights" is false in general — it recovers a
+*policy* whose ranking matches, and the weight vector is one of many.
+
 ---
 
 ## 6. Interpretation and limits
@@ -352,12 +382,18 @@ third the size of the measured +0.2358, so the positive result is well powered
 and the 0.40 null is a genuine "no detectable difference" rather than noise
 masquerading as a reversal. Report the MDE with every null.
 
-**Generality is one domain, twice.** The portfolio result transfers the
-machinery — same evolver, objectives, constraints, hypervolume — to a different
-problem class and reaches 98.7% of a computable optimum. It does not transfer
-the matching insight, and the second domain is analytic and three-parameter, so
-there is no sampling noise to defeat. A third domain with sampled observations
-is the next honest test before claiming universal applicability.
+**Generality is three domains.** The portfolio result transfers the machinery —
+same evolver, objectives, constraints, hypervolume — to a different problem class
+and reaches 98.7% of a computable optimum; the auction result transfers it to a
+*sampled* objective and reaches 95.96% of a closed-form equilibrium. Neither
+transfers the matching insight, and both second and third domains are
+three-parameter families. The next honest test is real market data.
+
+**A gain you can reproduce is not a parameterisation you can identify.** Across
+six seeds the gain is +0.2333 ± 0.0000 while the recovered weight vectors differ
+by up to 0.3688 L1. The ranking is identified; the weights are one member of a
+near-equivalent set. Any claim about "recovered weights" must carry that spread
+beside it, or it is overfitting a single lucky draw.
 
 ---
 
